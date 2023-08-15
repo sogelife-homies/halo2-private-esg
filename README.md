@@ -1,5 +1,5 @@
 # Halo2 Scaffolding
 
 ## HW
-- `integer_division.rs`
-- `var_subarray.rs`
+- `examples/integer_division.rs`
+- `examples/var_subarray.rs`
