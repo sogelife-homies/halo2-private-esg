@@ -3,11 +3,10 @@
 pragma solidity ^0.8.21;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "solmate/tokens/ERC20.sol";
+import "./interfaces/IERC20.sol";
+import "solmate/utils/SafeTransferLib.sol";
+import "solmate/utils/ReentrancyGuard.sol";
 import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -56,15 +55,8 @@ struct SnarkedVault {
  * @title   Alpha Pro Vault
  * @notice  A vault that provides liquidity on Uniswap V3.
  */
-contract AlphaProVault is
-    IVault,
-    IUniswapV3MintCallback,
-    IUniswapV3SwapCallback,
-    ERC20Upgradeable,
-    ReentrancyGuardUpgradeable
-{
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    using SafeMathUpgradeable for uint256;
+contract AlphaProVault is IVault, IUniswapV3MintCallback, IUniswapV3SwapCallback, ERC20, ReentrancyGuardUpgradeable {
+    using SafeTransferLib for IERC20;
 
     event Deposit(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
     event Withdraw(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
@@ -94,8 +86,8 @@ contract AlphaProVault is
     event UpdateMaxTotalSupply(uint256 maxTotalSupply);
 
     IUniswapV3Pool public override pool;
-    IERC20Upgradeable public token0;
-    IERC20Upgradeable public token1;
+    IERC20 public token0;
+    IERC20 public token1;
     AlphaProVaultFactory public factory;
 
     uint256 public constant MINIMUM_LIQUIDITY = 1e3;
@@ -134,8 +126,8 @@ contract AlphaProVault is
         __ReentrancyGuard_init();
 
         pool = IUniswapV3Pool(_params.pool);
-        token0 = IERC20Upgradeable(pool.token0());
-        token1 = IERC20Upgradeable(pool.token1());
+        token0 = IERC20(pool.token0());
+        token1 = IERC20(pool.token1());
 
         int24 _tickSpacing = pool.tickSpacing();
         tickSpacing = _tickSpacing;
@@ -637,7 +629,7 @@ contract AlphaProVault is
     /**
      * @notice Removes tokens accidentally sent to this vault.
      */
-    function sweep(IERC20Upgradeable token, uint256 amount, address to) external onlyManager {
+    function sweep(IERC20 token, uint256 amount, address to) external onlyManager {
         require(token != token0 && token != token1, "token");
         token.safeTransfer(to, amount);
     }
