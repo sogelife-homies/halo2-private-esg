@@ -3,13 +3,13 @@ pragma solidity ^0.7.6;
 pragma abicoder v2;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {IERC20} from "../contracts/interfaces/IERC20.sol";
+import "openzeppelin/token/ERC20/IERC20.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
-import "solmate/utils/SafeTransferLib.sol";
 
 // | Name                 | Type                                     | Slot | Offset | Bytes   | Contract                                  |
 // |----------------------|------------------------------------------|------|--------|---------|-------------------------------------------|
@@ -24,7 +24,7 @@ import "solmate/utils/SafeTransferLib.sol";
 // | observations         | struct Oracle.Observation[65535]         | 8    | 0      | 2097120 | contracts/UniswapV3Pool.sol:UniswapV3Pool |
 
 contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
-    using SafeTransferLib for IERC20;
+    using SafeERC20 for IERC20;
 
     uint256 public FORK_AT_BLOCK = 18_149_980;
     address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;

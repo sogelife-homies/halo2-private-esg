@@ -3,10 +3,11 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
-import "solmate/tokens/ERC20.sol";
-import "./interfaces/IERC20.sol";
-import "solmate/utils/SafeTransferLib.sol";
-import "solmate/utils/ReentrancyGuard.sol";
+import "openzeppelin/utils/math/SafeMath.sol";
+import "openzeppelin/token/ERC20/ERC20.sol";
+import "openzeppelin/token/ERC20/IERC20.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin/utils/ReentrancyGuard.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -55,7 +56,7 @@ struct SnarkedVault {
  * @notice  A vault that provides liquidity on Uniswap V3.
  */
 contract AlphaProVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, ERC20, ReentrancyGuard {
-    using SafeTransferLib for IERC20;
+    using SafeERC20 for IERC20;
 
     event Deposit(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
     event Withdraw(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
