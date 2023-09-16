@@ -11,6 +11,7 @@ pub enum SnarkCmd {
     Prove,
     /// Verify a proof
     Verify,
+    EVM,
 }
 
 impl std::fmt::Display for SnarkCmd {
@@ -20,6 +21,7 @@ impl std::fmt::Display for SnarkCmd {
             Self::Keygen => write!(f, "keygen"),
             Self::Prove => write!(f, "prove"),
             Self::Verify => write!(f, "verify"),
+            Self::EVM => write!(f, "evmproof"),
         }
     }
 }

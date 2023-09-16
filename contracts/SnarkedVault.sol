@@ -7,15 +7,14 @@ import "solmate/tokens/ERC20.sol";
 import "./interfaces/IERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 import "solmate/utils/ReentrancyGuard.sol";
-import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
-import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
-import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
-import "@uniswap/v3-periphery/contracts/libraries/PositionKey.sol";
+import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
+import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "v3-core/contracts/libraries/TickMath.sol";
+import "v3-periphery/libraries/LiquidityAmounts.sol";
+import "v3-periphery/libraries/PositionKey.sol";
 
-import "./AlphaProVaultFactory.sol";
-import "../interfaces/IVault.sol";
+import "./VaultFactory.sol";
 
 /**
  * @param pool Underlying Uniswap V3 pool address
@@ -55,7 +54,7 @@ struct SnarkedVault {
  * @title   Alpha Pro Vault
  * @notice  A vault that provides liquidity on Uniswap V3.
  */
-contract AlphaProVault is IVault, IUniswapV3MintCallback, IUniswapV3SwapCallback, ERC20, ReentrancyGuardUpgradeable {
+contract AlphaProVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, ERC20, ReentrancyGuard {
     using SafeTransferLib for IERC20;
 
     event Deposit(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);

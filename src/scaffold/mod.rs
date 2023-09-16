@@ -5,7 +5,9 @@
 use axiom_eth::{
     keccak::FnSynthesize,
     util::{
-        circuit::{PinnableCircuit, PreCircuit},
+        circuit::{
+            custom_gen_evm_verifier_shplonk, write_calldata_generic, PinnableCircuit, PreCircuit,
+        },
         AggregationConfigPinning, Halo2ConfigPinning,
     },
 };
@@ -318,6 +320,32 @@ pub fn run_cli<P: PreCircuit>(precircuit: P, cli: Cli) {
             >(verifier_params, &vk, strategy, &[&[instance]], &mut transcript)
             .unwrap();
             println!("Snark verified successfully!");
+        }
+        SnarkCmd::EVM => {
+            let pinning_path = config_path.join(PathBuf::from(format!("{name}.json")));
+            let pinning = P::Pinning::from_path(pinning_path);
+            pinning.set_var();
+            let circuit =
+                precircuit.create_circuit(CircuitBuilderStage::Prover, Some(pinning), &params);
+            let pk_path = data_path.join(PathBuf::from(format!("{name}.pk")));
+            let pk = custom_read_pk(pk_path, &circuit);
+            let snark_path = data_path.join(PathBuf::from(format!("{name}.snark")));
+            if snark_path.exists() {
+                fs::remove_file(&snark_path).unwrap();
+            }
+            let deployment_code = custom_gen_evm_verifier_shplonk(
+                &params,
+                pk.get_vk(),
+                &circuit,
+                Some(Path::new("evm/verifier.yul")),
+            );
+            write_calldata_generic(
+                &params,
+                &pk,
+                circuit,
+                Path::new("evm/call_data.hex"),
+                Some(deployment_code),
+            );
         }
     }
 }
