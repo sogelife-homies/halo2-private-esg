@@ -82,6 +82,9 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         (uint256 a0_, uint256 a1_) = pool.mint(address(this), tickLower, tickUpper, liquidity, "");
         console2.log(a0_);
         console2.log(a1_);
+
+        assert(IERC20(USDC).balanceOf(address(this)) == 100 ether - a0_);
+        assert(IERC20(WETH).balanceOf(address(this)) == 100 ether - a1_);
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
