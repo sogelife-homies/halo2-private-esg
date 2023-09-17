@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import {Test, console2} from "forge-std/Test.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
-import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin/token/ERC20/SafeERC20.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -30,8 +30,8 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
     address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address USDC_ETH_005 = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
-
-    function mintMainnetWETH(address token, uint256 amount, address to) public {}
+    IUniswapV3Pool pool = IUniswapV3Pool(USDC_ETH_005);
+    int24 tickSpacing = 10;
 
     function setUp() public {
         string memory RPC_URL = vm.envString("RPC_URL");
@@ -44,6 +44,14 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
             0x000000000000000000000000000000000000786c81dddd3294ff7bab5448d612
         );
     }
+    /// @dev Rounds tick down towards negative infinity so that it's a multiple
+    /// of `tickSpacing`.
+
+    function _floor(int24 tick) internal view returns (int24) {
+        int24 compressed = tick / tickSpacing;
+        if (tick < 0 && tick % tickSpacing != 0) compressed--;
+        return compressed * tickSpacing;
+    }
 
     function testForkedUniv3LPing() public {
         deal(WETH, address(this), 100 ether);
@@ -52,21 +60,11 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         deal(USDC, address(this), 100 ether);
         assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
 
-        IUniswapV3Pool pool = IUniswapV3Pool(USDC_ETH_005);
-
-        (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        ) = pool.slot0();
+        (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
         console2.log(uint256(sqrtPriceX96));
 
-        uint24 tickLower = tick - 100;
-        uint24 tickUpper = tick + 100;
+        int24 tickLower = _floor(tick);
+        int24 tickUpper = tickLower + tickSpacing;
 
         uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
         uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
@@ -86,7 +84,7 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         console2.log(a1_);
     }
 
-    function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata data) external override {
+    function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
         require(msg.sender == address(USDC_ETH_005));
         if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
         if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);

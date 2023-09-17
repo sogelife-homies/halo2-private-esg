@@ -6,7 +6,7 @@ pragma abicoder v2;
 import "openzeppelin/utils/math/SafeMath.sol";
 import "openzeppelin/token/ERC20/ERC20.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
-import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin/token/ERC20/SafeERC20.sol";
 import "openzeppelin/utils/ReentrancyGuard.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
