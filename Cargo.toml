@@ -34,6 +34,12 @@ snark-verifier-sdk = { git = "https://github.com/axiom-crypto/snark-verifier.git
   "loader_halo2",
 ] }
 
+num-bigint = "0.4"
+num-traits = "0.2"
+num-integer = "0.1"
+itertools = "0.10.5"
+
+
 [dev-dependencies]
 test-log = "=0.2.11"
 ethers-core = "=2.0.6"
