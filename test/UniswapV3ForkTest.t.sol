@@ -11,6 +11,7 @@ import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "./YulDeployerTest.t.sol";
+import "../contracts/DummyVault.sol";
 
 // | Name                 | Type                                     | Slot | Offset | Bytes   | Contract                                  |
 // |----------------------|------------------------------------------|------|--------|---------|-------------------------------------------|
@@ -57,6 +58,7 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
     function testDummyStrat() public {
         _testYulVerifierDeploy();
         console2.log(verifierAddress);
+        DummyVault dv = DummyVault(verifierAddress);
     }
 
     function testForkedUniv3LPing() public {
