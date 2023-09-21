@@ -10,6 +10,7 @@ import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
+import "./YulDeployerTest.t.sol";
 
 // | Name                 | Type                                     | Slot | Offset | Bytes   | Contract                                  |
 // |----------------------|------------------------------------------|------|--------|---------|-------------------------------------------|
@@ -23,7 +24,7 @@ import "v3-core/contracts/libraries/TickMath.sol";
 // | positions            | mapping(bytes32 => struct Position.Info) | 7    | 0      | 32      | contracts/UniswapV3Pool.sol:UniswapV3Pool |
 // | observations         | struct Oracle.Observation[65535]         | 8    | 0      | 2097120 | contracts/UniswapV3Pool.sol:UniswapV3Pool |
 
-contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
+contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
     using SafeERC20 for IERC20;
 
     uint256 public FORK_AT_BLOCK = 18_149_980;
@@ -53,6 +54,11 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         return compressed * tickSpacing;
     }
 
+    function testDummyStrat() public {
+        _testYulVerifierDeploy();
+        console2.log(verifierAddress);
+    }
+
     function testForkedUniv3LPing() public {
         deal(WETH, address(this), 100 ether);
         assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
@@ -61,7 +67,7 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
 
         (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
-        console2.log(uint256(sqrtPriceX96));
+        // console2.log(uint256(sqrtPriceX96));
 
         int24 tickLower = _floor(tick);
         int24 tickUpper = tickLower + tickSpacing;
@@ -72,7 +78,7 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, 1600_000000, 1_000000000000000000
         );
-        console2.log(uint256(liquidity));
+        // console2.log(uint256(liquidity));
 
         (uint256 a0, uint256 a1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
@@ -85,6 +91,10 @@ contract UniswapV3ForkTest is Test, IUniswapV3MintCallback {
 
         assert(IERC20(USDC).balanceOf(address(this)) == 100 ether - a0_);
         assert(IERC20(WETH).balanceOf(address(this)) == 100 ether - a1_);
+
+        (uint256 w0_, uint256 w1_) = pool.burn(tickLower, tickUpper, liquidity);
+        console2.log(w0_);
+        console2.log(w1_);
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
