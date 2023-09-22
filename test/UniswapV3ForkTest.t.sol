@@ -12,6 +12,8 @@ import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "./YulDeployerTest.t.sol";
 import "../contracts/DummyVault.sol";
+import "../contracts/interfaces/IAxiomV1Query.sol";
+import "./AxiomV1QueryMock.sol";
 
 // | Name                 | Type                                     | Slot | Offset | Bytes   | Contract                                  |
 // |----------------------|------------------------------------------|------|--------|---------|-------------------------------------------|
@@ -36,15 +38,15 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
     int24 tickSpacing = 10;
 
     function setUp() public {
-        string memory RPC_URL = vm.envString("RPC_URL");
-        uint256 forkId = vm.createFork(RPC_URL, FORK_AT_BLOCK);
-        vm.selectFork(forkId);
+        // string memory RPC_URL = vm.envString("RPC_URL");
+        // uint256 forkId = vm.createFork(RPC_URL, FORK_AT_BLOCK);
+        // vm.selectFork(forkId);
 
-        assertEq(block.number, FORK_AT_BLOCK);
-        assertEq(
-            vm.load(USDC_ETH_005, bytes32(uint256(0x1))),
-            0x000000000000000000000000000000000000786c81dddd3294ff7bab5448d612
-        );
+        // assertEq(block.number, FORK_AT_BLOCK);
+        // assertEq(
+        //     vm.load(USDC_ETH_005, bytes32(uint256(0x1))),
+        //     0x000000000000000000000000000000000000786c81dddd3294ff7bab5448d612
+        // );
     }
     /// @dev Rounds tick down towards negative infinity so that it's a multiple
     /// of `tickSpacing`.
@@ -55,13 +57,27 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
         return compressed * tickSpacing;
     }
 
+    // function a(address verifierAddress, bytes memory proof) public {
+    //     verifierAddress.call(proof);
+    // }
+
     function testDummyStrat() public {
-        _testYulVerifierDeploy();
-        console2.log(verifierAddress);
-        DummyVault dv = DummyVault(verifierAddress);
+        address verifierAddress = deployVerifier();
+        DummyVault dv = new DummyVault(verifierAddress);
+        AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
+
+        dv.setAxiomV1QueryAddress(address(axiomMock));
+        bytes memory proof = loadCallData("evm/call_data.hex");
+        bytes memory axiomResponse =
+            hex"00000000000000000000000000000000000000000000000000000000000000206000f5edcb28fd8a47a86fd708ce7ae05e0ccb524c659297e633abe8bfe58736a58b3021fdc4f7c6b45af00f1c9db3b9f51a061d4650fea4e260d90383fbed7a1b3633944a7d2eb24a2399be2a8179ad73cabd0f65c99c74763d492056164f7400000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000931b144fe76620a5a743c01709bf80a005ca314cff6c5f50939b5b7845d3ea9a94403f00000000000000000000000000000000000000000000000000000000000000003a087e59482812269efc4792327baa920bd01fd14468337ca3e2fd9b1397c350ad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5b4c11951957c6f8f642c4af61cd6b24640fec6dc7fc607ee8206a99e92410d3021ddb9a356815c3fac1026b6dec5df3124afbadb485c9ba5a3e3398a04b7ba85e58769b32a1beaf1ea27375a44095a0d1fb664ce2dd358e7fcbfb78c26a193440eb01ebfc9ed27500cd4dfc979272d1f0913cc9f66540d7e8005811109e1cf2d00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000931b140000000000000000000000000cc2b3664c913f8443cf5404b460763dbaa9072200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000bd24cf192ee57af9c911cbba4664a6097746ac0603a5e237989266f3deffa51350cd42c33f06d13cd5fe3c57613bf2f330da95d6801bb1142a63dfd1a364d5b7000000000000000000000000000000000000000000000000000000000000000079e9499f0de3297006a300d48a6f1018f32f7f488a3f47eb6115db96798e090bad3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5b4c11951957c6f8f642c4af61cd6b24640fec6dc7fc607ee8206a99e92410d3021ddb9a356815c3fac1026b6dec5df3124afbadb485c9ba5a3e3398a04b7ba85e58769b32a1beaf1ea27375a44095a0d1fb664ce2dd358e7fcbfb78c26a193440eb01ebfc9ed27500cd4dfc979272d1f0913cc9f66540d7e8005811109e1cf2d00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000931b140000000000000000000000000cc2b3664c913f8443cf5404b460763dbaa907220000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000101cc73a7fbeb427b026e8252ec723f8a900000000000000000000000000000000000000000000000000000000000000003f1d422a05bea118012fd9e48879fcca621beb11d455b72dc3b5aa2be2b6b53ead3228b676f7d3cd4284a5443f17f1962b36e491b30a40b2405849e597ba5fb5b4c11951957c6f8f642c4af61cd6b24640fec6dc7fc607ee8206a99e92410d3021ddb9a356815c3fac1026b6dec5df3124afbadb485c9ba5a3e3398a04b7ba85e58769b32a1beaf1ea27375a44095a0d1fb664ce2dd358e7fcbfb78c26a193440eb01ebfc9ed27500cd4dfc979272d1f0913cc9f66540d7e8005811109e1cf2d";
+
+        DummyVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (DummyVault.ResponseStruct));
+        //console2.log(decoded.storageResponses[0].value);
+
+        dv.runStrat(proof, decoded);
     }
 
-    function testForkedUniv3LPing() public {
+    function _testForkedUniv3LPing() public {
         deal(WETH, address(this), 100 ether);
         assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
 

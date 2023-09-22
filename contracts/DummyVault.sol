@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "openzeppelin/access/Ownable.sol";
 import "./interfaces/IAxiomV1Query.sol";
+import "./libraries/BytesLib.sol";
 
 contract DummyVault is Ownable {
     struct ResponseStruct {
@@ -17,7 +18,7 @@ contract DummyVault is Ownable {
 
     event RebalanceData(uint32 blockNumber, address addr, uint256 slot, uint256 value);
 
-    address public constant AXIOM_V1_QUERY_GOERLI_ADDR = 0x4Fb202140c5319106F15706b1A69E441c9536306;
+    address public axiomV1QueryAddress = 0x4Fb202140c5319106F15706b1A69E441c9536306;
 
     address public stratVerfifierAddress;
 
@@ -26,12 +27,16 @@ contract DummyVault is Ownable {
         stratVerfifierAddress = _stratVerfifierAddress;
     }
 
-    function setstratVerfifierAddress(address _stratVerfifierAddress) external onlyOwner {
+    function setAxiomV1QueryAddress(address _axiomV1QueryAddress) external onlyOwner {
+        axiomV1QueryAddress = _axiomV1QueryAddress;
+    }
+
+    function setStratVerfifierAddress(address _stratVerfifierAddress) external onlyOwner {
         stratVerfifierAddress = _stratVerfifierAddress;
     }
 
     function _validateStorageProof(ResponseStruct calldata axiomResponse) private view {
-        IAxiomV1Query axiomV1Query = IAxiomV1Query(AXIOM_V1_QUERY_GOERLI_ADDR);
+        IAxiomV1Query axiomV1Query = IAxiomV1Query(axiomV1QueryAddress);
 
         bool valid = axiomV1Query.areResponsesValid(
             axiomResponse.keccakBlockResponse,
@@ -44,28 +49,6 @@ contract DummyVault is Ownable {
         if (!valid) {
             revert("StorageProofValidationError");
         }
-    }
-
-    function toBytes32(bytes memory _bytes, uint256 _start) internal pure returns (bytes32) {
-        require(_bytes.length >= _start + 32, "toBytes32_outOfBounds");
-        bytes32 tempBytes32;
-
-        assembly {
-            tempBytes32 := mload(add(add(_bytes, 0x20), _start))
-        }
-
-        return tempBytes32;
-    }
-
-    function toBytes16(bytes memory _bytes, uint256 _start) internal pure returns (bytes16) {
-        require(_bytes.length >= _start + 16, "toBytes16_outOfBounds");
-        bytes16 tempBytes16;
-
-        assembly {
-            tempBytes16 := mload(add(add(_bytes, 0x10), _start))
-        }
-
-        return tempBytes16;
     }
 
     function runStrat(bytes calldata proof, ResponseStruct calldata axiomResponse) public {
@@ -82,10 +65,12 @@ contract DummyVault is Ownable {
         // uint256 _blockNumber = uint256(bytes32(proof[384 + 64:384 + 96]));
         // address account = address(bytes20(proof[384 + 108:384 + 128]));
 
-        uint256 _blockHash = (uint256(toBytes32(proof, 384)) << 128) | uint128(toBytes16(proof, 384 + 48));
+        // uint256 _blockHash =
+        //     (uint256(BytesLib.toBytes32(proof, 384)) << 128) | uint128(BytesLib.toBytes16(proof, 384 + 48));
         // uint256 _blockNumber = uint256(bytes32(proof[384 + 64:384 + 96]));
         // address account = address(bytes20(proof[384 + 108:384 + 128]));
-
+        //revert("SnarkVerificationFailed");
+        _validateStorageProof(axiomResponse);
         (bool success,) = stratVerfifierAddress.call(proof);
         if (!success) {
             revert("SnarkVerificationFailed");

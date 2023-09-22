@@ -5,8 +5,6 @@ pragma abicoder v2;
 import {Test, console2} from "forge-std/Test.sol";
 
 contract YulDeployerTest is Test {
-    address public verifierAddress;
-
     function loadCallData(string memory callDataPath) public returns (bytes memory callData) {
         string memory bashCmd =
             string(abi.encodePacked('cast abi-encode "f(bytes)" $(cat ', string(abi.encodePacked(callDataPath, ")"))));
@@ -54,12 +52,18 @@ contract YulDeployerTest is Test {
         return deployedAddress;
     }
 
-    function _testYulVerifierDeploy() public {
+    function deployVerifier() public returns (address) {
         bytes memory bytecode = compile("evm/verifier");
-        verifierAddress = deployContract(bytecode);
+        return deployContract(bytecode);
+    }
+
+    function _testYulVerifierDeploy() public {
+        address verifierAddress = deployVerifier();
+        console2.log(verifierAddress);
 
         bytes memory proof = loadCallData("evm/call_data.hex");
         (bool success,) = verifierAddress.call(proof);
+
         if (!success) {
             revert("SnarkVerificationFailed");
         }
