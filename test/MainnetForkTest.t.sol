@@ -10,10 +10,11 @@ import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
-import "./YulDeployerTest.t.sol";
+import "./yul/YulDeployerTest.t.sol";
+//import "./ForkTest.t.sol";
 import "../contracts/DummyVault.sol";
 import "../contracts/interfaces/IAxiomV1Query.sol";
-import "./AxiomV1QueryMock.sol";
+import "./mocks/AxiomV1QueryMock.sol";
 
 // | Name                 | Type                                     | Slot | Offset | Bytes   | Contract                                  |
 // |----------------------|------------------------------------------|------|--------|---------|-------------------------------------------|
@@ -27,26 +28,27 @@ import "./AxiomV1QueryMock.sol";
 // | positions            | mapping(bytes32 => struct Position.Info) | 7    | 0      | 32      | contracts/UniswapV3Pool.sol:UniswapV3Pool |
 // | observations         | struct Oracle.Observation[65535]         | 8    | 0      | 2097120 | contracts/UniswapV3Pool.sol:UniswapV3Pool |
 
-contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
+contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
     using SafeERC20 for IERC20;
 
-    uint256 public FORK_AT_BLOCK = 18_149_980;
-    address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address USDC_ETH_005 = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
-    IUniswapV3Pool pool = IUniswapV3Pool(USDC_ETH_005);
-    int24 tickSpacing = 10;
+    uint256 constant FORK_AT_BLOCK = 18_149_980;
+    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant USDC_WETH_005 = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
+    IUniswapV3Pool pool = IUniswapV3Pool(USDC_WETH_005);
+    int24 tickSpacing;
+    //constructor() ForkTest(FORK_AT_BLOCK, USDC, WETH, USDC_WETH_005) {}
 
     function setUp() public {
-        // string memory RPC_URL = vm.envString("RPC_URL");
-        // uint256 forkId = vm.createFork(RPC_URL, FORK_AT_BLOCK);
-        // vm.selectFork(forkId);
-
-        // assertEq(block.number, FORK_AT_BLOCK);
-        // assertEq(
-        //     vm.load(USDC_ETH_005, bytes32(uint256(0x1))),
-        //     0x000000000000000000000000000000000000786c81dddd3294ff7bab5448d612
-        // );
+        string memory RPC_URL = vm.envString("RPC_URL");
+        uint256 forkId = vm.createFork(RPC_URL, FORK_AT_BLOCK);
+        vm.selectFork(forkId);
+        assertEq(block.number, FORK_AT_BLOCK);
+        assertEq(
+            vm.load(USDC_WETH_005, bytes32(uint256(0x1))),
+            0x000000000000000000000000000000000000786c81dddd3294ff7bab5448d612
+        );
+        tickSpacing = pool.tickSpacing();
     }
     /// @dev Rounds tick down towards negative infinity so that it's a multiple
     /// of `tickSpacing`.
@@ -62,8 +64,10 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
     // }
 
     function testDummyStrat() public {
+        //tickSpacing = pool.tickSpacing();
+
         address verifierAddress = deployVerifier();
-        DummyVault dv = new DummyVault(verifierAddress);
+        DummyVault dv = new DummyVault(USDC_WETH_005, verifierAddress);
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
 
         dv.setAxiomV1QueryAddress(address(axiomMock));
@@ -77,7 +81,7 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
         dv.runStrat(proof, decoded);
     }
 
-    function _testForkedUniv3LPing() public {
+    function testForkedUniv3LPing() public {
         deal(WETH, address(this), 100 ether);
         assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
 
@@ -100,23 +104,23 @@ contract UniswapV3ForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
         (uint256 a0, uint256 a1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
-        console2.log(a0);
-        console2.log(a1);
+        // console2.log(a0);
+        // console2.log(a1);
 
         (uint256 a0_, uint256 a1_) = pool.mint(address(this), tickLower, tickUpper, liquidity, "");
-        console2.log(a0_);
-        console2.log(a1_);
+        // console2.log(a0_);
+        // console2.log(a1_);
 
         assert(IERC20(USDC).balanceOf(address(this)) == 100 ether - a0_);
         assert(IERC20(WETH).balanceOf(address(this)) == 100 ether - a1_);
 
         (uint256 w0_, uint256 w1_) = pool.burn(tickLower, tickUpper, liquidity);
-        console2.log(w0_);
-        console2.log(w1_);
+        // console2.log(w0_);
+        // console2.log(w1_);
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
-        require(msg.sender == address(USDC_ETH_005));
+        require(msg.sender == address(USDC_WETH_005));
         if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
         if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);
     }

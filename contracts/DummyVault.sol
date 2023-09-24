@@ -2,11 +2,16 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
+import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
+import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "v3-periphery/libraries/LiquidityAmounts.sol";
+import "v3-core/contracts/libraries/TickMath.sol";
 import "openzeppelin/access/Ownable.sol";
 import "./interfaces/IAxiomV1Query.sol";
 import "./libraries/BytesLib.sol";
 
-contract DummyVault is Ownable {
+contract DummyVault is Ownable, IUniswapV3MintCallback {
     struct ResponseStruct {
         bytes32 keccakBlockResponse;
         bytes32 keccakAccountResponse;
@@ -18,13 +23,18 @@ contract DummyVault is Ownable {
 
     event RebalanceData(uint32 blockNumber, address addr, uint256 slot, uint256 value);
 
-    address public axiomV1QueryAddress = 0x4Fb202140c5319106F15706b1A69E441c9536306;
+    // storage poof verifier
+    address public axiomV1QueryAddress = 0x4Fb202140c5319106F15706b1A69E441c9536306; // Goerli address
 
+    // halo-2 strat verifier
     address public stratVerfifierAddress;
+    // pool
+    address public poolAddress;
 
-    constructor(address _stratVerfifierAddress) Ownable() {
+    constructor(address _poolAddress, address _stratVerfifierAddress) Ownable() {
         require(_stratVerfifierAddress != address(0), "No verifier");
         stratVerfifierAddress = _stratVerfifierAddress;
+        poolAddress = _poolAddress;
     }
 
     function setAxiomV1QueryAddress(address _axiomV1QueryAddress) external onlyOwner {
@@ -51,7 +61,9 @@ contract DummyVault is Ownable {
         }
     }
 
-    function runStrat(bytes calldata proof, ResponseStruct calldata axiomResponse) public {
+    // TODO public witness in included both axiomResponse and stratProof (*)
+
+    function runStrat(bytes calldata stratProof, ResponseStruct calldata axiomResponse) public {
         // Extract instances from proof
         // The public instances are laid out in the proof calldata as follows:
         // First 4 * 3 * 32 = 384 bytes are reserved for proof verification data used with the pairing precompile
@@ -71,9 +83,16 @@ contract DummyVault is Ownable {
         // address account = address(bytes20(proof[384 + 108:384 + 128]));
         //revert("SnarkVerificationFailed");
         _validateStorageProof(axiomResponse);
-        (bool success,) = stratVerfifierAddress.call(proof);
+        (bool success,) = stratVerfifierAddress.call(stratProof);
         if (!success) {
             revert("SnarkVerificationFailed");
         }
+        // TODO Any Rebalance - mint & burn position
+    }
+
+    function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
+        // require(msg.sender == address(USDC_ETH_005));
+        // if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
+        // if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);
     }
 }
