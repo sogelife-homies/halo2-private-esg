@@ -19,6 +19,7 @@ struct DummyVaultParams {
     int24 baseThreshold;
     int24 limitThreshold;
     uint24 fullRangeWeight;
+    address axiomV1QueryAddress;
     address stratVerfifierAddress;
 }
 
@@ -78,6 +79,7 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
         fullUpper = (TickMath.MAX_TICK / _tickSpacing) * _tickSpacing;
 
         stratVerfifierAddress = _params.stratVerfifierAddress;
+        axiomV1QueryAddress = params.axiomV1QueryAddress;
 
         _checkThreshold(_params.baseThreshold, _tickSpacing);
         _checkThreshold(_params.limitThreshold, _tickSpacing);
