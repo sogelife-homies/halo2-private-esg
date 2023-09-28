@@ -8,10 +8,23 @@ import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "openzeppelin/access/Ownable.sol";
+import "openzeppelin/token/ERC20/IERC20.sol";
+import "openzeppelin/math/SafeMath.sol";
+import "v3-periphery/libraries/PositionKey.sol";
 import "./interfaces/IAxiomV1Query.sol";
 import "./libraries/BytesLib.sol";
 
+struct DummyVaultParams {
+    address pool;
+    int24 baseThreshold;
+    int24 limitThreshold;
+    uint24 fullRangeWeight;
+    address stratVerfifierAddress;
+}
+
 contract DummyVault is Ownable, IUniswapV3MintCallback {
+    using SafeMath for uint256;
+
     struct ResponseStruct {
         bytes32 keccakBlockResponse;
         bytes32 keccakAccountResponse;
@@ -29,12 +42,53 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     // halo-2 strat verifier
     address public stratVerfifierAddress;
     // pool
-    address public poolAddress;
+    IUniswapV3Pool public poolAddress;
 
-    constructor(address _poolAddress, address _stratVerfifierAddress) Ownable() {
-        require(_stratVerfifierAddress != address(0), "No verifier");
-        stratVerfifierAddress = _stratVerfifierAddress;
-        poolAddress = _poolAddress;
+    uint24 public fullRangeWeight;
+    int24 public baseThreshold;
+    int24 public limitThreshold;
+    int24 public tickSpacing;
+    int24 public fullLower;
+    int24 public fullUpper;
+    int24 public baseLower;
+    int24 public baseUpper;
+    int24 public limitLower;
+    int24 public limitUpper;
+
+    IERC20 token0;
+    IERC20 token1;
+
+    constructor() Ownable() {
+    }
+
+    function initialize(DummyVaultParams memory _params) public {
+        poolAddress = IUniswapV3Pool(_params.pool);
+
+        token0 = IERC20(poolAddress.token0());
+        token1 = IERC20(poolAddress.token1());
+
+        int24 _tickSpacing = poolAddress.tickSpacing();
+        tickSpacing = _tickSpacing;
+
+        baseThreshold = _params.baseThreshold;
+        limitThreshold = _params.limitThreshold;
+        fullRangeWeight = _params.fullRangeWeight;
+
+        fullLower = (TickMath.MIN_TICK / _tickSpacing) * _tickSpacing;
+        fullUpper = (TickMath.MAX_TICK / _tickSpacing) * _tickSpacing;
+
+        stratVerfifierAddress = _params.stratVerfifierAddress;
+
+        _checkThreshold(_params.baseThreshold, _tickSpacing);
+        _checkThreshold(_params.limitThreshold, _tickSpacing);
+        require(_params.fullRangeWeight <= 1e6, "fullRangeWeight must be <= 1e6");
+        require(_params.stratVerfifierAddress != address(0), "No verifier");
+    }
+
+    function _checkThreshold(int24 threshold, int24 _tickSpacing) internal pure {
+        require(threshold > 0, "threshold must be > 0");
+        require(threshold <= TickMath.MAX_TICK, "threshold too high");
+        require(threshold % _tickSpacing == 0, "threshold must be multiple of tickSpacing");
     }
 
     function setAxiomV1QueryAddress(address _axiomV1QueryAddress) external onlyOwner {
@@ -59,6 +113,87 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
         if (!valid) {
             revert("StorageProofValidationError");
         }
+    }
+
+    function _floor(int24 tick) internal view returns (int24) {
+        int24 compressed = tick / tickSpacing;
+        if (tick < 0 && tick % tickSpacing != 0) compressed--;
+        return compressed * tickSpacing;
+    }
+
+    function _position(
+        int24 tickLower,
+        int24 tickUpper
+    ) internal view returns (uint128, uint256, uint256, uint128, uint128) {
+        bytes32 positionKey = PositionKey.compute(address(this), tickLower, tickUpper);
+        return poolAddress.positions(positionKey);
+    }
+
+    function _burnAndCollect(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidity
+    )
+        internal
+        returns (uint256 burned0, uint256 burned1, uint256 feesToVault0, uint256 feesToVault1)
+    {
+        if (liquidity > 0) {
+            (burned0, burned1) = poolAddress.burn(tickLower, tickUpper, liquidity);
+        }
+
+        // Collect all owed tokens including earned fees
+        (uint256 collect0, uint256 collect1) = poolAddress.collect(
+            address(this),
+            tickLower,
+            tickUpper,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        feesToVault0 = collect0.sub(burned0);
+        feesToVault1 = collect1.sub(burned1);
+    }
+
+    function _mintLiquidity(int24 tickLower, int24 tickUpper, uint128 liquidity) internal {
+        if (liquidity > 0) {
+            poolAddress.mint(address(this), tickLower, tickUpper, liquidity, "");
+        }
+    }
+
+     function _liquidityForAmounts(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0,
+        uint256 amount1
+    ) internal view returns (uint128) {
+        (uint160 sqrtRatioX96, , , , , , ) = poolAddress.slot0();
+        return
+            LiquidityAmounts.getLiquidityForAmounts(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(tickLower),
+                TickMath.getSqrtRatioAtTick(tickUpper),
+                amount0,
+                amount1
+            );
+    }
+
+    /// @dev Casts uint256 to uint128 with overflow check.
+    function _toUint128(uint256 x) internal pure returns (uint128) {
+        assert(x <= type(uint128).max);
+        return uint128(x);
+    }
+
+    function getBalance0() public view returns (uint256) {
+        return
+            token0.balanceOf(address(this));
+    }
+
+    /**
+     * @notice Balance of token1 in vault not used in any position.
+     */
+    function getBalance1() public view returns (uint256) {
+        return
+            token1.balanceOf(address(this));
     }
 
     // TODO public witness in included both axiomResponse and stratProof (*)
@@ -87,7 +222,76 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
         if (!success) {
             revert("SnarkVerificationFailed");
         }
-        // TODO Any Rebalance - mint & burn position
+
+        // Rebelance
+
+        int24 _fullLower = fullLower;
+        int24 _fullUpper = fullUpper;
+        {
+            (uint128 fullLiquidity, , , , ) = _position(_fullLower, _fullUpper);
+            (uint128 baseLiquidity, , , , ) = _position(baseLower, baseUpper);
+            (uint128 limitLiquidity, , , , ) = _position(limitLower, limitUpper);
+            _burnAndCollect(_fullLower, _fullUpper, fullLiquidity);
+            _burnAndCollect(baseLower, baseUpper, baseLiquidity);
+            _burnAndCollect(limitLower, limitUpper, limitLiquidity);
+        }
+
+        // Calculate new ranges
+        (, int24 tick, , , , , ) = poolAddress.slot0();
+        int24 tickFloor = _floor(tick);
+        int24 tickCeil = tickFloor + tickSpacing;
+
+        int24 _baseLower = tickFloor - baseThreshold;
+        int24 _baseUpper = tickCeil + baseThreshold;
+        int24 _bidLower = tickFloor - limitThreshold;
+        int24 _bidUpper = tickFloor;
+        int24 _askLower = tickCeil;
+        int24 _askUpper = tickCeil + limitThreshold;
+
+        // Emit snapshot to record balances and supply
+        uint256 balance0 = getBalance0();
+        uint256 balance1 = getBalance1();
+
+        // Place full range order on Uniswap
+        {
+            uint128 maxFullLiquidity = _liquidityForAmounts(
+                _fullLower,
+                _fullUpper,
+                balance0,
+                balance1
+            );
+            uint128 fullLiquidity = _toUint128(
+                uint256(maxFullLiquidity).mul(fullRangeWeight).div(1e6)
+            );
+            _mintLiquidity(_fullLower, _fullUpper, fullLiquidity);
+        }
+
+        // Place base order on Uniswap
+        balance0 = getBalance0();
+        balance1 = getBalance1();
+        {
+            uint128 baseLiquidity = _liquidityForAmounts(
+                _baseLower,
+                _baseUpper,
+                balance0,
+                balance1
+            );
+            _mintLiquidity(_baseLower, _baseUpper, baseLiquidity);
+            (baseLower, baseUpper) = (_baseLower, _baseUpper);
+        }
+
+        // Place bid or ask order on Uniswap depending on which token is left
+        balance0 = getBalance0();
+        balance1 = getBalance1();
+        uint128 bidLiquidity = _liquidityForAmounts(_bidLower, _bidUpper, balance0, balance1);
+        uint128 askLiquidity = _liquidityForAmounts(_askLower, _askUpper, balance0, balance1);
+        if (bidLiquidity > askLiquidity) {
+            _mintLiquidity(_bidLower, _bidUpper, bidLiquidity);
+            (limitLower, limitUpper) = (_bidLower, _bidUpper);
+        } else {
+            _mintLiquidity(_askLower, _askUpper, askLiquidity);
+            (limitLower, limitUpper) = (_askLower, _askUpper);
+        }
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {

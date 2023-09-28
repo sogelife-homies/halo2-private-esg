@@ -67,7 +67,14 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         //tickSpacing = pool.tickSpacing();
 
         address verifierAddress = deployVerifier();
-        DummyVault dv = new DummyVault(USDC_WETH_005, verifierAddress);
+        DummyVault dv = new DummyVault();
+        dv.initialize(DummyVaultParams({
+            pool: USDC_WETH_005,
+            baseThreshold: 10,
+            limitThreshold: 10,
+            fullRangeWeight: 10,
+            stratVerfifierAddress: verifierAddress
+        }));
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
 
         dv.setAxiomV1QueryAddress(address(axiomMock));
