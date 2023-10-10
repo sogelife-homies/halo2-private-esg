@@ -65,10 +65,24 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
     function testDummyStrat() public {
         //tickSpacing = pool.tickSpacing();
+        deal(WETH, address(this), 100 ether);
+        assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
+        deal(USDC, address(this), 100 ether);
+        assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
 
         address verifierAddress = deployVerifier();
         DummyVault dv = new DummyVault(USDC_WETH_005, verifierAddress);
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
+
+        IERC20(USDC).approve(address(dv), 1 ether);
+        IERC20(WETH).approve(address(dv), 1 ether);
+
+        assert(IERC20(USDC).allowance(address(this), address(dv)) == 1 ether);
+        assert(IERC20(WETH).allowance(address(this), address(dv)) == 1 ether);
+
+        dv.deposit(1 ether, 1 ether);
+        assert(IERC20(USDC).balanceOf(address(this)) == 99 ether);
+        assert(IERC20(WETH).balanceOf(address(this)) == 99 ether);
 
         dv.setAxiomV1QueryAddress(address(axiomMock));
         bytes memory proof = loadCallData("evm/call_data.hex");

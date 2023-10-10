@@ -5,13 +5,17 @@ pragma abicoder v2;
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "openzeppelin/access/Ownable.sol";
+import "openzeppelin/token/ERC20/SafeERC20.sol";
 import "./interfaces/IAxiomV1Query.sol";
 import "./libraries/BytesLib.sol";
 
 contract DummyVault is Ownable, IUniswapV3MintCallback {
+    using SafeERC20 for IERC20;
+
     struct ResponseStruct {
         bytes32 keccakBlockResponse;
         bytes32 keccakAccountResponse;
@@ -30,11 +34,15 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     address public stratVerfifierAddress;
     // pool
     address public poolAddress;
+    address public token0;
+    address public token1;
 
     constructor(address _poolAddress, address _stratVerfifierAddress) Ownable() {
         require(_stratVerfifierAddress != address(0), "No verifier");
         stratVerfifierAddress = _stratVerfifierAddress;
         poolAddress = _poolAddress;
+        token0 = IUniswapV3Pool(_poolAddress).token0();
+        token1 = IUniswapV3Pool(_poolAddress).token1();
     }
 
     function setAxiomV1QueryAddress(address _axiomV1QueryAddress) external onlyOwner {
@@ -62,6 +70,11 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     }
 
     // TODO public witness in included both axiomResponse and stratProof (*)
+
+    function deposit(uint256 amount0Desired, uint256 amount1Desired) public {
+        if (amount0Desired > 0) IERC20(token0).safeTransferFrom(msg.sender, address(this), amount0Desired);
+        if (amount1Desired > 0) IERC20(token1).safeTransferFrom(msg.sender, address(this), amount1Desired);
+    }
 
     function runStrat(bytes calldata stratProof, ResponseStruct calldata axiomResponse) public {
         // Extract instances from proof

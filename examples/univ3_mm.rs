@@ -16,11 +16,11 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use std::env::{set_var, var};
 
-const N: usize = 32;
+const N: usize = 64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CircuitInput {
-    pub x: [[u8; 20]; N], // field element, but easier to deserialize as a string
+    pub x: Vec<Vec<u8>>, // field element, but easier to deserialize as a string
 }
 
 // https://hackmd.io/@tazAymRSQCGXTUKkbh1BAg/r1vcQLl8is
@@ -28,7 +28,8 @@ fn sqrtx96_to_63fp63<F: ScalarField>(
     ctx: &mut Context<F>,
     sqrtx96: &AssignedValue<F>,
     fpc: &FixedPointChip<F, 63>,
-) where
+) -> halo2_base::AssignedValue<F>
+where
     F: BigPrimeField,
 {
     let range_chip = fpc.range_gate();
@@ -51,7 +52,8 @@ fn sqrtx96_to_63fp63<F: ScalarField>(
     let ten2twelve = fpc.quantization(1000000000000.0);
     let q4 = fpc.qdiv(ctx, q3, Constant(ten2twelve));
     let d = fpc.dequantization(*q4.value());
-    println!("d: {d:?}");
+    println!("{d:?},");
+    q3
 }
 
 fn some_algorithm_in_zk<F: ScalarField>(
@@ -68,12 +70,14 @@ fn some_algorithm_in_zk<F: ScalarField>(
     let fpc = FixedPointChip::<F, PRECISION_BITS>::default(lookup_bits);
 
     // fixed-point exp arithmetic
-    (0..N).for_each(|i| {
-        let x = F::from_bytes_le(&input.x[i]);
-        let x = ctx.load_witness(x);
-        make_public.push(x);
-        sqrtx96_to_63fp63(ctx, &x, &fpc);
-    })
+    (0..N)
+        .map(|i| {
+            let x = F::from_bytes_le(&input.x[i]);
+            let x = ctx.load_witness(x);
+            make_public.push(x);
+            sqrtx96_to_63fp63(ctx, &x, &fpc)
+        })
+        .fold(|f, s| fpc.qadd(ctx));
 }
 
 #[tokio::main]
@@ -90,7 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     const U160_BYTES: usize = 20;
     // let mut prices: [u8; N * U160_BYTES];
-    let mut prices = [[0u8; U160_BYTES]; N];
+    //let mut prices = [[0u8; U160_BYTES]; N];
+    let mut prices: Vec<Vec<u8>> = Vec::new();
     for hour in 0..N {
         let block_number = BlockId::Number((start_block - hour * blocks_per_hour).into());
         let slot1 = provider.get_storage_at(address, slot_number, Some(block_number)).await?;
@@ -102,7 +107,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("srqt_ratio_x96: {srqt_ratio_x96:?}");
 
         srqt_ratio_x96_bytes.reverse();
-        prices[hour][0..].clone_from_slice(&srqt_ratio_x96_bytes);
+        prices.push(Vec::from(srqt_ratio_x96_bytes));
+        //prices[hour][0..].clone_from_slice(&srqt_ratio_x96_bytes);
     }
 
     // let slot1 = provider.get_storage_at(H256::from(1), BlockId::from(18_149_980)).await?;
