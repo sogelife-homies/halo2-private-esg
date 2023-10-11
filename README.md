@@ -1,9 +1,10 @@
 ## axiom-univ3-mm
 
-RUST_BACLTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 keygen
-RUST_BACLTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 prove
-RUST_BACLTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 verify
-RUST_BACLTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 evm
+RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 keygen
+RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 prove
+RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 verify
+RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 evm
+RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 mock
 
 ### Test
 

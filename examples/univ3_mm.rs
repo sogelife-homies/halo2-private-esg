@@ -53,7 +53,24 @@ where
     let q4 = fpc.qdiv(ctx, q3, Constant(ten2twelve));
     let d = fpc.dequantization(*q4.value());
     println!("{d:?},");
-    q3
+    q4
+}
+
+fn fp63_to_sqrtx96<F: ScalarField>(
+    ctx: &mut Context<F>,
+    fp63: &AssignedValue<F>,
+    decimals: u32,
+    fpc: &FixedPointChip<F, 63>,
+) -> halo2_base::AssignedValue<F>
+where
+    F: BigPrimeField,
+{
+    let range_chip = fpc.range_gate();
+    let a = Constant(F::from_u128(10_u128.pow(decimals)));
+
+    let norm_fp63 = range_chip.gate().mul(ctx, *fp63, a);
+    let b = Constant(F::from_u128(2_u128.pow(33)));
+    range_chip.gate().mul(ctx, norm_fp63, b)
 }
 
 fn some_algorithm_in_zk<F: ScalarField>(
@@ -63,21 +80,77 @@ fn some_algorithm_in_zk<F: ScalarField>(
 ) where
     F: BigPrimeField,
 {
-    //let x = F::from_str_vartime(&input.x).expect("deserialize field element should not fail");
     const PRECISION_BITS: u32 = 63;
     let lookup_bits =
         var("LOOKUP_BITS").unwrap_or_else(|_| panic!("LOOKUP_BITS not set")).parse().unwrap();
     let fpc = FixedPointChip::<F, PRECISION_BITS>::default(lookup_bits);
 
+    let zero = ctx.load_constant(F::from_u128(0u128));
     // fixed-point exp arithmetic
-    (0..N)
+
+    let qPrices = (0..N)
         .map(|i| {
             let x = F::from_bytes_le(&input.x[i]);
             let x = ctx.load_witness(x);
             make_public.push(x);
             sqrtx96_to_63fp63(ctx, &x, &fpc)
         })
-        .fold(|f, s| fpc.qadd(ctx));
+        .collect::<Vec<AssignedValue<F>>>();
+
+    let sum = qPrices.iter().fold(zero, |acc, x| fpc.qadd(ctx, acc, *x));
+    let len = ctx.load_constant(fpc.quantization(N as f64));
+    println!("Sum {:?}", fpc.dequantization(*sum.value()));
+    println!("len {:?}", *len.value());
+    let TWO: AssignedValue<F> = ctx.load_constant(F::from_u128(2_u128)); //ctx.load_constant(fpc.quantization(2.0));
+    println!("TWO {:?}", *TWO.value());
+    let mean: AssignedValue<F> = fpc.qdiv(ctx, sum, len);
+
+    println!("Diff");
+    let sq_diff = qPrices
+        .into_iter()
+        .map(|x| {
+            let diff = fpc.qsub(ctx, x, mean);
+            let diff_2 = fpc.qmul(ctx, diff, diff);
+            println!("{:?}", fpc.dequantization(*diff_2.value()));
+            diff_2
+        })
+        .collect::<Vec<AssignedValue<F>>>();
+    let sq_diff_sum = sq_diff.iter().fold(zero, |acc, x| fpc.qadd(ctx, acc, *x));
+    let avg_sq_diff_sum = fpc.qdiv(ctx, sq_diff_sum, len);
+    let std = fpc.qsqrt(ctx, avg_sq_diff_sum);
+    // println!("sq_diff_sum {:?}", fpc.dequantization(*sq_diff_sum.value()));
+    println!("std {:?}", fpc.dequantization(*std.value()));
+    let two_std = fpc.qadd(ctx, std, std);
+    let lower_bound = fpc.qsub(ctx, mean, two_std);
+    let upper_bound = fpc.qadd(ctx, mean, two_std);
+
+    println!("mean {:?}", fpc.dequantization(*mean.value()));
+    println!("lower_bound {:?}", fpc.dequantization(*lower_bound.value()));
+    println!("upper_bound {:?}", fpc.dequantization(*upper_bound.value()));
+    println!("mean_fp {:?}", *mean.value());
+    println!("lower_bound_fp {:?}", *lower_bound.value());
+    println!("upper_bound_fp {:?}", *upper_bound.value());
+
+    //let sqrt_mean = fpc.qsqrt(ctx, mean);
+    let sqrt_lower_bound = fpc.qsqrt(ctx, lower_bound);
+    let sqrt_upper_bound = fpc.qsqrt(ctx, upper_bound);
+
+    //println!("sqrt_mean {:?}", fpc.dequantization(*sqrt_mean.value()));
+    println!("sqrt_lower_bound {:?}", fpc.dequantization(*sqrt_lower_bound.value()));
+    println!("sqrt_upper_bound {:?}", fpc.dequantization(*sqrt_upper_bound.value()));
+    //println!("sqrt_mean_fp {:?}", *sqrt_mean.value());
+    println!("sqrt_lower_bound_fp {:?}", *sqrt_lower_bound.value());
+    println!("sqrt_upper_bound_fp {:?}", *sqrt_upper_bound.value());
+
+    // let sqrt96_mean = fp63_to_sqrtx96(ctx, &sqrt_mean, 6, &fpc);
+    let sqrt96_lb = fp63_to_sqrtx96(ctx, &sqrt_lower_bound, 6, &fpc);
+    let sqrt96_ub = fp63_to_sqrtx96(ctx, &sqrt_upper_bound, 6, &fpc);
+    //println!("sqrt96_mean {:?}", *sqrt96_mean.value());
+    println!("sqrt96_lb {:?}", *sqrt96_lb.value());
+    println!("sqrt96_ub {:?}", *sqrt96_ub.value());
+
+    make_public.push(sqrt96_lb);
+    make_public.push(sqrt96_ub);
 }
 
 #[tokio::main]
