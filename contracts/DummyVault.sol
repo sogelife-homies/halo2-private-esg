@@ -7,10 +7,14 @@ import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
-import "openzeppelin/access/Ownable.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
+import "openzeppelin/token/ERC20/SafeERC20.sol";
 import "openzeppelin/math/SafeMath.sol";
 import "v3-periphery/libraries/PositionKey.sol";
+import "openzeppelin-upgradeable/proxy/utils/Initializeable.sol";
+import "openzeppelin-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "openzeppelin-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IAxiomV1Query.sol";
 import "./libraries/BytesLib.sol";
 
@@ -21,24 +25,23 @@ struct DummyVaultParams {
     uint24 fullRangeWeight;
     address axiomV1QueryAddress;
     address stratVerfifierAddress;
+    string name;
+    string symbol;
 }
 
-contract DummyVault is Ownable, IUniswapV3MintCallback {
+contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallback, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     struct ResponseStruct {
-        bytes32 keccakBlockResponse;
-        bytes32 keccakAccountResponse;
-        bytes32 keccakStorageResponse;
-        IAxiomV1Query.BlockResponse[] blockResponses;
-        IAxiomV1Query.AccountResponse[] accountResponses;
-        IAxiomV1Query.StorageResponse[] storageResponses;
+        bytes32 keccakQueryResponse;
     }
 
     event RebalanceData(uint32 blockNumber, address addr, uint256 slot, uint256 value);
+    event Deposit(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
 
     // storage poof verifier
-    address public axiomV1QueryAddress = 0x4Fb202140c5319106F15706b1A69E441c9536306; // Goerli address
+    address public axiomV1QueryAddress; // Goerli address
 
     // halo-2 strat verifier
     address public stratVerfifierAddress;
@@ -59,10 +62,11 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     IERC20 token0;
     IERC20 token1;
 
-    constructor() Ownable() {
-    }
+    function initialize(DummyVaultParams memory _params) public initializer {
+        __ERC20_init(_params.name, _params.symbol);
+        __ReentrancyGuard_init();
+        __Ownable_init();
 
-    function initialize(DummyVaultParams memory _params) public {
         poolAddress = IUniswapV3Pool(_params.pool);
 
         token0 = IERC20(poolAddress.token0());
@@ -79,7 +83,7 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
         fullUpper = (TickMath.MAX_TICK / _tickSpacing) * _tickSpacing;
 
         stratVerfifierAddress = _params.stratVerfifierAddress;
-        axiomV1QueryAddress = params.axiomV1QueryAddress;
+        axiomV1QueryAddress = _params.axiomV1QueryAddress;
 
         _checkThreshold(_params.baseThreshold, _tickSpacing);
         _checkThreshold(_params.limitThreshold, _tickSpacing);
@@ -104,14 +108,10 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     function _validateStorageProof(ResponseStruct calldata axiomResponse) private view {
         IAxiomV1Query axiomV1Query = IAxiomV1Query(axiomV1QueryAddress);
 
-        bool valid = axiomV1Query.areResponsesValid(
-            axiomResponse.keccakBlockResponse,
-            axiomResponse.keccakAccountResponse,
-            axiomResponse.keccakStorageResponse,
-            axiomResponse.blockResponses,
-            axiomResponse.accountResponses,
-            axiomResponse.storageResponses
+        bool valid = axiomV1Query.verifiedKeccakResults(
+            axiomResponse.keccakQueryResponse
         );
+
         if (!valid) {
             revert("StorageProofValidationError");
         }
@@ -198,7 +198,84 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
             token1.balanceOf(address(this));
     }
 
+    function _poke(int24 tickLower, int24 tickUpper) internal {
+        (uint128 liquidity,,,,) = _position(tickLower, tickUpper);
+        if (liquidity > 0) {
+            pool.burn(tickLower, tickUpper, 0);
+        }
+    }
+
+    function _calcSharesAndAmounts(uint256 amount0Desired, uint256 amount1Desired)
+        internal
+        view
+        returns (uint256 shares, uint256 amount0, uint256 amount1)
+    {
+        uint256 totalSupply = totalSupply();
+        (uint256 total0, uint256 total1) = getTotalAmounts();
+
+        // If total supply > 0, vault can't be empty
+        assert(totalSupply == 0 || total0 > 0 || total1 > 0);
+
+        if (totalSupply == 0) {
+            // For first deposit, just use the amounts desired
+            amount0 = amount0Desired;
+            amount1 = amount1Desired;
+            shares = (amount0 > amount1 ? amount0 : amount1).sub(MINIMUM_LIQUIDITY);
+        } else if (total0 == 0) {
+            amount1 = amount1Desired;
+            shares = amount1.mul(totalSupply).div(total1);
+        } else if (total1 == 0) {
+            amount0 = amount0Desired;
+            shares = amount0.mul(totalSupply).div(total0);
+        } else {
+            uint256 cross0 = amount0Desired.mul(total1);
+            uint256 cross1 = amount1Desired.mul(total0);
+            uint256 cross = cross0 > cross1 ? cross1 : cross0;
+            require(cross > 0, "cross");
+
+            // Round up amounts
+            amount0 = cross.sub(1).div(total1).add(1);
+            amount1 = cross.sub(1).div(total0).add(1);
+            shares = cross.mul(totalSupply).div(total0).div(total1);
+        }
+    }
+
     // TODO public witness in included both axiomResponse and stratProof (*)
+
+    function deposit(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address to)
+        external
+        override
+        nonReentrant
+        returns (uint256 shares, uint256 amount0, uint256 amount1)
+    {
+        require(amount0Desired > 0 || amount1Desired > 0, "amount0Desired or amount1Desired");
+        require(to != address(0) && to != address(this), "to");
+
+        // Poke positions so vault's current holdings are up-to-date
+        _poke(fullLower, fullUpper);
+        _poke(baseLower, baseUpper);
+        _poke(limitLower, limitUpper);
+
+        // Calculate amounts proportional to vault's holdings
+        (shares, amount0, amount1) = _calcSharesAndAmounts(amount0Desired, amount1Desired);
+        require(shares > 0, "shares");
+        require(amount0 >= amount0Min, "amount0Min");
+        require(amount1 >= amount1Min, "amount1Min");
+
+        // Permanently lock the first MINIMUM_LIQUIDITY tokens
+        if (totalSupply() == 0) {
+            _mint(address(factory), MINIMUM_LIQUIDITY);
+        }
+
+        // Pull in tokens from sender
+        if (amount0 > 0) token0.safeTransferFrom(msg.sender, address(this), amount0);
+        if (amount1 > 0) token1.safeTransferFrom(msg.sender, address(this), amount1);
+
+        // Mint shares to recipient
+        _mint(to, shares);
+        emit Deposit(msg.sender, to, shares, amount0, amount1);
+        require(totalSupply() <= maxTotalSupply, "maxTotalSupply");
+    }
 
     function runStrat(bytes calldata stratProof, ResponseStruct calldata axiomResponse) public {
         // Extract instances from proof
@@ -297,8 +374,8 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
-        // require(msg.sender == address(USDC_ETH_005));
-        // if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
-        // if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);
+        require(msg.sender == address(poolAddress));
+        if (amount0 > 0) IERC20(token0).safeTransfer(msg.sender, amount0);
+        if (amount1 > 0) IERC20(token1).safeTransfer(msg.sender, amount1);
     }
 }
