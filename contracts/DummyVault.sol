@@ -183,7 +183,6 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
             );
     }
 
-    /// @dev Casts uint256 to uint128 with overflow check.
     function _toUint128(uint256 x) internal pure returns (uint128) {
         assert(x <= type(uint128).max);
         return uint128(x);
@@ -194,9 +193,6 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
             token0.balanceOf(address(this));
     }
 
-    /**
-     * @notice Balance of token1 in vault not used in any position.
-     */
     function getBalance1() public view returns (uint256) {
         return
             token1.balanceOf(address(this));

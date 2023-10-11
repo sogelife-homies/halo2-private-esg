@@ -42,4 +42,8 @@ contract AxiomV1QueryMock {
     ) external view returns (bool) {
         return true;
     }
+
+    function verifiedKeccakResults(bytes32 keccakQueryResponse) external view returns(bool) {
+        return true;
+    }
 }
