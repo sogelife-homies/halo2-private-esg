@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import "forge-std/Script.sol";
 import "forge-std/Base.sol";
 import "../contracts/DummyVault.sol";
-import "openzeppelin/proxy/TransparentUpgradeableProxy.sol";
+import "openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "forge-std/console.sol";
 
 abstract contract Utils is ScriptBase {
@@ -63,7 +63,10 @@ contract InitialDeployDummyVault is Script, Utils {
             limitThreshold: (int24)(vm.envInt("LIMIT_THRESHOLD")),
             fullRangeWeight: (uint24)(vm.envUint("FULL_RANGE_WEIGHT")),
             stratVerfifierAddress: verifier,
-            axiomV1QueryAddress: vm.envAddress("AXIOM_V1_QUERY_ADDRESS")
+            axiomV1QueryAddress: vm.envAddress("AXIOM_V1_QUERY_ADDRESS"),
+            name: "ZK-MM LPs",
+            symbol: "ZMLP",
+            maxTotalSupply: type(uint256).max
         }));
         
         new TransparentUpgradeableProxy(address(vaultImplementation), vm.addr(deployerPrivateKey), initCallData);
@@ -75,13 +78,13 @@ contract InitialDeployDummyVault is Script, Utils {
 contract UpdateDummyVaultImplementation is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        TransparentUpgradeableProxy proxy = (TransparentUpgradeableProxy)(payable(vm.envAddress('ACTUAL_DUMMY_VAULT')));
+        ITransparentUpgradeableProxy proxy = (ITransparentUpgradeableProxy)(payable(vm.envAddress('ACTUAL_DUMMY_VAULT')));
 
         vm.startBroadcast(deployerPrivateKey);
 
         DummyVault vaultImplementation = new DummyVault();
         
-        proxy.upgradeTo(address(vaultImplementation));
+        proxy.upgradeToAndCall(address(vaultImplementation), "0x");
 
         vm.stopBroadcast();
     }

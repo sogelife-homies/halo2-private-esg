@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity >=0.7.6;
 pragma abicoder v2;
 
 // Constants and free functions to be inlined into by AxiomV1Core

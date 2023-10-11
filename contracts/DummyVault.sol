@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
@@ -7,13 +7,12 @@ import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
-import "openzeppelin/token/ERC20/SafeERC20.sol";
-import "openzeppelin/math/SafeMath.sol";
 import "v3-periphery/libraries/PositionKey.sol";
-import "openzeppelin-upgradeable/proxy/utils/Initializeable.sol";
+import "openzeppelin-upgradeable/proxy/utils/Initializable.sol";
 import "openzeppelin-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "openzeppelin-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IAxiomV1Query.sol";
 import "./libraries/BytesLib.sol";
@@ -25,17 +24,19 @@ struct DummyVaultParams {
     uint24 fullRangeWeight;
     address axiomV1QueryAddress;
     address stratVerfifierAddress;
+    uint256 maxTotalSupply;
     string name;
     string symbol;
 }
 
-contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallback, ERC20Upgradeable, ReentrancyGuardUpgradeable {
-    using SafeMath for uint256;
+contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     struct ResponseStruct {
         bytes32 keccakQueryResponse;
     }
+
+    uint256 public constant MINIMUM_LIQUIDITY = 1e3;
 
     event RebalanceData(uint32 blockNumber, address addr, uint256 slot, uint256 value);
     event Deposit(address indexed sender, address indexed to, uint256 shares, uint256 amount0, uint256 amount1);
@@ -58,6 +59,7 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
     int24 public baseUpper;
     int24 public limitLower;
     int24 public limitUpper;
+    uint256 public maxTotalSupply;
 
     IERC20 token0;
     IERC20 token1;
@@ -65,7 +67,7 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
     function initialize(DummyVaultParams memory _params) public initializer {
         __ERC20_init(_params.name, _params.symbol);
         __ReentrancyGuard_init();
-        __Ownable_init();
+        __Ownable_init(_msgSender());
 
         poolAddress = IUniswapV3Pool(_params.pool);
 
@@ -84,6 +86,8 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
 
         stratVerfifierAddress = _params.stratVerfifierAddress;
         axiomV1QueryAddress = _params.axiomV1QueryAddress;
+
+        maxTotalSupply = _params.maxTotalSupply;
 
         _checkThreshold(_params.baseThreshold, _tickSpacing);
         _checkThreshold(_params.limitThreshold, _tickSpacing);
@@ -152,8 +156,8 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
             type(uint128).max
         );
 
-        feesToVault0 = collect0.sub(burned0);
-        feesToVault1 = collect1.sub(burned1);
+        feesToVault0 = collect0 - burned0;
+        feesToVault1 = collect1 - burned1;
     }
 
     function _mintLiquidity(int24 tickLower, int24 tickUpper, uint128 liquidity) internal {
@@ -201,8 +205,40 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
     function _poke(int24 tickLower, int24 tickUpper) internal {
         (uint128 liquidity,,,,) = _position(tickLower, tickUpper);
         if (liquidity > 0) {
-            pool.burn(tickLower, tickUpper, 0);
+            poolAddress.burn(tickLower, tickUpper, 0);
         }
+    }
+
+    function _amountsForLiquidity(int24 tickLower, int24 tickUpper, uint128 liquidity)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        (uint160 sqrtRatioX96,,,,,,) = poolAddress.slot0();
+        return LiquidityAmounts.getAmountsForLiquidity(
+            sqrtRatioX96, TickMath.getSqrtRatioAtTick(tickLower), TickMath.getSqrtRatioAtTick(tickUpper), liquidity
+        );
+    }
+    
+    function getPositionAmounts(int24 tickLower, int24 tickUpper)
+        public
+        view
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (uint128 liquidity,,, uint128 tokensOwed0, uint128 tokensOwed1) = _position(tickLower, tickUpper);
+        (amount0, amount1) = _amountsForLiquidity(tickLower, tickUpper, liquidity);
+
+        // Subtract protocol and manager fees
+        amount0 = (amount0 + uint256(tokensOwed0)) / 1e6;
+        amount1 = (amount1 + uint256(tokensOwed1)) / 1e6;
+    }
+
+    function getTotalAmounts() public view returns (uint256 total0, uint256 total1) {
+        (uint256 fullAmount0, uint256 fullAmount1) = getPositionAmounts(fullLower, fullUpper);
+        (uint256 baseAmount0, uint256 baseAmount1) = getPositionAmounts(baseLower, baseUpper);
+        (uint256 limitAmount0, uint256 limitAmount1) = getPositionAmounts(limitLower, limitUpper);
+        total0 = getBalance0() + fullAmount0 + baseAmount0 + limitAmount0;
+        total1 = getBalance1() + fullAmount1 + baseAmount1 + limitAmount1;
     }
 
     function _calcSharesAndAmounts(uint256 amount0Desired, uint256 amount1Desired)
@@ -220,23 +256,23 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
             // For first deposit, just use the amounts desired
             amount0 = amount0Desired;
             amount1 = amount1Desired;
-            shares = (amount0 > amount1 ? amount0 : amount1).sub(MINIMUM_LIQUIDITY);
+            shares = (amount0 > amount1 ? amount0 : amount1) - MINIMUM_LIQUIDITY;
         } else if (total0 == 0) {
             amount1 = amount1Desired;
-            shares = amount1.mul(totalSupply).div(total1);
+            shares = amount1 * totalSupply / total1;
         } else if (total1 == 0) {
             amount0 = amount0Desired;
-            shares = amount0.mul(totalSupply).div(total0);
+            shares = amount0 * totalSupply / total0;
         } else {
-            uint256 cross0 = amount0Desired.mul(total1);
-            uint256 cross1 = amount1Desired.mul(total0);
+            uint256 cross0 = amount0Desired * total1;
+            uint256 cross1 = amount1Desired * total0;
             uint256 cross = cross0 > cross1 ? cross1 : cross0;
             require(cross > 0, "cross");
 
             // Round up amounts
-            amount0 = cross.sub(1).div(total1).add(1);
-            amount1 = cross.sub(1).div(total0).add(1);
-            shares = cross.mul(totalSupply).div(total0).div(total1);
+            amount0 = (cross - 1) / (total1 + 1);
+            amount1 = (cross - 1) / (total0 + 1);
+            shares = (cross * totalSupply) / total0 / total1;
         }
     }
 
@@ -244,7 +280,6 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
 
     function deposit(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address to)
         external
-        override
         nonReentrant
         returns (uint256 shares, uint256 amount0, uint256 amount1)
     {
@@ -264,7 +299,7 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
 
         // Permanently lock the first MINIMUM_LIQUIDITY tokens
         if (totalSupply() == 0) {
-            _mint(address(factory), MINIMUM_LIQUIDITY);
+            _mint(owner(), MINIMUM_LIQUIDITY);
         }
 
         // Pull in tokens from sender
@@ -340,7 +375,7 @@ contract DummyVault is Initializeable, OwnableUpgradeable, IUniswapV3MintCallbac
                 balance1
             );
             uint128 fullLiquidity = _toUint128(
-                uint256(maxFullLiquidity).mul(fullRangeWeight).div(1e6)
+                uint256(maxFullLiquidity) * fullRangeWeight / 1e6
             );
             _mintLiquidity(_fullLower, _fullUpper, fullLiquidity);
         }

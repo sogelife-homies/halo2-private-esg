@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import {Test, console2} from "forge-std/Test.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
-import "openzeppelin/token/ERC20/SafeERC20.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
