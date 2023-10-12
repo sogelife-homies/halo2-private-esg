@@ -31,7 +31,12 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
     using SafeERC20 for IERC20;
 
     struct ResponseStruct {
-        bytes32 keccakQueryResponse;
+        bytes32 keccakBlockResponse;
+        bytes32 keccakAccountResponse;
+        bytes32 keccakStorageResponse;
+        IAxiomV1Query.BlockResponse[] blockResponses;
+        IAxiomV1Query.AccountResponse[] accountResponses;
+        IAxiomV1Query.StorageResponse[] storageResponses;
     }
 
     uint256 public constant MINIMUM_LIQUIDITY = 1e3;
@@ -95,10 +100,14 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
     function _validateStorageProof(ResponseStruct calldata axiomResponse) private view {
         IAxiomV1Query axiomV1Query = IAxiomV1Query(axiomV1QueryAddress);
 
-        bool valid = axiomV1Query.verifiedKeccakResults(
-            axiomResponse.keccakQueryResponse
+        bool valid = axiomV1Query.areResponsesValid(
+            axiomResponse.keccakBlockResponse,
+            axiomResponse.keccakAccountResponse,
+            axiomResponse.keccakStorageResponse,
+            axiomResponse.blockResponses,
+            axiomResponse.accountResponses,
+            axiomResponse.storageResponses
         );
-
         if (!valid) {
             revert("StorageProofValidationError");
         }
