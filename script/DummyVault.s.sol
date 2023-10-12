@@ -129,8 +129,7 @@ contract EncodeRunStrat is Script, Utils {
     function run() external {
         DummyVault dv = (DummyVault)(vm.envAddress('ACTUAL_DUMMY_VAULT'));
         bytes memory proof = loadCallData("evm/call_data.hex");
-        bytes memory axiomResponse =
-            hex"86c169984056cbe342e68d30d33f5eb547a258824502753ab37c62fcecd0d37f";
+        bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
 
         DummyVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (DummyVault.ResponseStruct));
 
