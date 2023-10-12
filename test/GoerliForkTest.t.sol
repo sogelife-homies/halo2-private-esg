@@ -34,9 +34,11 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
     using SafeERC20 for IERC20;
     // https://www.geckoterminal.com/goerli-testnet/pools/0x4d1892f15b03db24b55e73f9801826a56d6f0755
 
-    uint256 constant FORK_AT_BLOCK = 9746819;
-    address constant WETH = 0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6;
-    address constant V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+    uint256 constant FORK_AT_BLOCK = 9852780;
+    address constant WETH = 0xF81631aEdB2C5324c6dea012Ac3eb181F1179e6C;
+    address constant USDC = 0x4eff99da09F7ea5aCb8754c3731012eC957591FB;
+    address constant USDC_WETH_005 = 0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f;
+    IUniswapV3Pool pool = IUniswapV3Pool(USDC_WETH_005);
     int24 tickSpacing;
 
     function setUp() public {
@@ -44,6 +46,7 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         uint256 forkId = vm.createFork(RPC_URL, FORK_AT_BLOCK);
         vm.selectFork(forkId);
         assertEq(block.number, FORK_AT_BLOCK);
+        tickSpacing = pool.tickSpacing();
     }
 
     function _floor(int24 tick) internal view returns (int24) {
@@ -62,8 +65,8 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         deal(usdcAddress, address(this), 100 ether);
         assertEq(USDC.balanceOf(address(this)), 100 ether);
 
-        IUniswapV3Factory factory = IUniswapV3Factory(V3_FACTORY);
-        address pool = factory.createPool(usdcAddress, WETH, 500);
+        // IUniswapV3Factory factory = IUniswapV3Factory(V3_FACTORY);
+        // address pool = factory.createPool(usdcAddress, WETH, 500);
 
         // (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
         // // console2.log(uint256(sqrtPriceX96));
@@ -95,9 +98,54 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         // console2.log(w1_);
     }
 
+    function testForkedUniv3LPing() public {
+        deal(WETH, address(this), 100 ether);
+        assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
+
+        deal(USDC, address(this), 100 ether);
+        assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
+
+        (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
+        // console2.log(uint256(sqrtPriceX96));
+
+        int24 tickLower = _floor(tick);
+        int24 tickUpper = tickLower + tickSpacing;
+
+        bytes memory proof = loadCallData("evm/call_data.hex");
+
+        uint160 sqrtRatioAX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2))));
+        uint160 sqrtRatioBX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2 + 32))));
+        // console2.log(uint256(sqrtRatioAX96));
+        // console2.log(uint256(sqrtRatioBX96));
+
+        // uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
+        // uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
+
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, 1600_000000, 1_000000000000000000
+        );
+        // console2.log(uint256(liquidity));
+
+        (uint256 a0, uint256 a1) =
+            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
+        // console2.log(a0);
+        // console2.log(a1);
+
+        (uint256 a0_, uint256 a1_) = pool.mint(address(this), tickLower, tickUpper, liquidity, "");
+        // console2.log(a0_);
+        // console2.log(a1_);
+
+        assert(IERC20(USDC).balanceOf(address(this)) == 100 ether - a0_);
+        assert(IERC20(WETH).balanceOf(address(this)) == 100 ether - a1_);
+
+        (uint256 w0_, uint256 w1_) = pool.burn(tickLower, tickUpper, liquidity);
+        // console2.log(w0_);
+        // console2.log(w1_);
+    }
+
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {
-        // require(msg.sender == address(USDC_WETH_005));
-        // if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
-        // if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);
+        require(msg.sender == address(USDC_WETH_005));
+        if (amount0 > 0) IERC20(USDC).safeTransfer(msg.sender, amount0);
+        if (amount1 > 0) IERC20(WETH).safeTransfer(msg.sender, amount1);
     }
 }

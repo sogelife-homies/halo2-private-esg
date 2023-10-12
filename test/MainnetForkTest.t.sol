@@ -117,8 +117,15 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         int24 tickLower = _floor(tick);
         int24 tickUpper = tickLower + tickSpacing;
 
-        uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
-        uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
+        bytes memory proof = loadCallData("evm/call_data.hex");
+
+        uint160 sqrtRatioAX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2))));
+        uint160 sqrtRatioBX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2 + 32))));
+        // console2.log(uint256(sqrtRatioAX96));
+        // console2.log(uint256(sqrtRatioBX96));
+
+        // uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(tickLower);
+        // uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
 
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, 1600_000000, 1_000000000000000000
