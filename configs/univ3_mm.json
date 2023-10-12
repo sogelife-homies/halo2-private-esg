@@ -1,10 +1,10 @@
 {
   "params": {
-    "degree": 15,
+    "degree": 20,
     "num_advice": 1,
     "num_lookup_advice": 1,
     "num_fixed": 1,
-    "lookup_bits": 14
+    "lookup_bits": 19
   },
   "break_points": [
     [],
