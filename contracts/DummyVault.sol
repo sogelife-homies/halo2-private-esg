@@ -36,13 +36,15 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
     address public poolAddress;
     address public token0;
     address public token1;
+    IUniswapV3Pool public pool;
 
     constructor(address _poolAddress, address _stratVerfifierAddress) Ownable() {
         require(_stratVerfifierAddress != address(0), "No verifier");
         stratVerfifierAddress = _stratVerfifierAddress;
         poolAddress = _poolAddress;
-        token0 = IUniswapV3Pool(_poolAddress).token0();
-        token1 = IUniswapV3Pool(_poolAddress).token1();
+        pool = IUniswapV3Pool(_poolAddress);
+        token0 = pool.token0();
+        token1 = pool.token1();
     }
 
     function setAxiomV1QueryAddress(address _axiomV1QueryAddress) external onlyOwner {
@@ -68,8 +70,6 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
             revert("StorageProofValidationError");
         }
     }
-
-    // TODO public witness in included both axiomResponse and stratProof (*)
 
     function deposit(uint256 amount0Desired, uint256 amount1Desired) public {
         if (amount0Desired > 0) IERC20(token0).safeTransferFrom(msg.sender, address(this), amount0Desired);
@@ -100,7 +100,29 @@ contract DummyVault is Ownable, IUniswapV3MintCallback {
         if (!success) {
             revert("SnarkVerificationFailed");
         }
-        // TODO Any Rebalance - mint & burn position
+
+        uint160 sqrtRatioAX96 = uint160((uint256(BytesLib.toBytes32(stratProof, 4096 / 2))));
+        uint160 sqrtRatioBX96 = uint160((uint256(BytesLib.toBytes32(stratProof, 4096 / 2 + 32))));
+
+        (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
+
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96,
+            sqrtRatioAX96,
+            sqrtRatioBX96,
+            IERC20(token0).balanceOf(address(this)),
+            IERC20(token1).balanceOf(address(this))
+        );
+        // console2.log(uint256(liquidity));
+
+        (uint256 a0, uint256 a1) =
+            LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
+        // console2.log(a0);
+        // console2.log(a1);
+
+        //(uint256 a0_, uint256 a1_) = pool.mint(address(this), tickLower, tickUpper, liquidity, "");
+        // console2.log(a0_);
+        // console2.log(a1_);
     }
 
     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external override {

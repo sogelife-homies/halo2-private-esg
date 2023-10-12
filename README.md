@@ -11,6 +11,7 @@ RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm 
 Goerli Pool factory: `https://goerli.etherscan.io/address/0x1f98431c8ad98523631ae4a59f267346ea31f984#readContract`
 
 `forge test --ffi -vvv --match-test=testDummyStrat`
+`forge test --ffi -vvv --match-test=testForkedUniv3LPing`
 
 `forge create --rpc-url $GOERLI_RPC_URL --private-key $PRIVATE_KEY test/mocks/MockERC20.sol:MockERC20 --etherscan-api-key $GOERLI_ETHERSCAN_KEY --verify`
 

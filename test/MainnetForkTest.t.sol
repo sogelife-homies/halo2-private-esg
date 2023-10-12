@@ -105,9 +105,8 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
         (uint160 sqrtPriceX96, int24 tick,,,,,) = pool.slot0();
         // console2.log(uint256(sqrtPriceX96));
-
-        int24 tickLower = _floor(tick);
-        int24 tickUpper = tickLower + tickSpacing;
+        // int24 tickLower = _floor(tick);
+        // int24 tickUpper = tickLower + tickSpacing;
 
         bytes memory proof = loadCallData("evm/call_data.hex");
 
@@ -122,8 +121,11 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, 1600_000000, 1_000000000000000000
         );
-        // console2.log(uint256(liquidity));
 
+        int24 tickLower = TickMath.getTickAtSqrtRatio(sqrtRatioAX96);
+        tickLower -= tickLower % 10;
+        int24 tickUpper = TickMath.getTickAtSqrtRatio(sqrtRatioBX96);
+        tickUpper -= tickUpper % 10;
         (uint256 a0, uint256 a1) =
             LiquidityAmounts.getAmountsForLiquidity(sqrtPriceX96, sqrtRatioAX96, sqrtRatioBX96, liquidity);
         // console2.log(a0);
