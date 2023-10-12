@@ -20,9 +20,6 @@ import "./libraries/BytesLib.sol";
 
 struct DummyVaultParams {
     address pool;
-    int24 baseThreshold;
-    int24 limitThreshold;
-    uint24 fullRangeWeight;
     address axiomV1QueryAddress;
     address stratVerfifierAddress;
     uint256 maxTotalSupply;
@@ -50,12 +47,7 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
     // pool
     IUniswapV3Pool public poolAddress;
 
-    uint24 public fullRangeWeight;
-    int24 public baseThreshold;
-    int24 public limitThreshold;
     int24 public tickSpacing;
-    int24 public fullLower;
-    int24 public fullUpper;
     int24 public baseLower;
     int24 public baseUpper;
     int24 public limitLower;
@@ -78,21 +70,11 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         int24 _tickSpacing = poolAddress.tickSpacing();
         tickSpacing = _tickSpacing;
 
-        baseThreshold = _params.baseThreshold;
-        limitThreshold = _params.limitThreshold;
-        fullRangeWeight = _params.fullRangeWeight;
-
-        fullLower = (TickMath.MIN_TICK / _tickSpacing) * _tickSpacing;
-        fullUpper = (TickMath.MAX_TICK / _tickSpacing) * _tickSpacing;
-
         stratVerfifierAddress = _params.stratVerfifierAddress;
         axiomV1QueryAddress = _params.axiomV1QueryAddress;
 
         maxTotalSupply = _params.maxTotalSupply;
 
-        _checkThreshold(_params.baseThreshold, _tickSpacing);
-        _checkThreshold(_params.limitThreshold, _tickSpacing);
-        require(_params.fullRangeWeight <= 1e6, "fullRangeWeight must be <= 1e6");
         require(_params.stratVerfifierAddress != address(0), "No verifier");
     }
 
@@ -231,11 +213,10 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
     }
 
     function getTotalAmounts() public view returns (uint256 total0, uint256 total1) {
-        (uint256 fullAmount0, uint256 fullAmount1) = getPositionAmounts(fullLower, fullUpper);
         (uint256 baseAmount0, uint256 baseAmount1) = getPositionAmounts(baseLower, baseUpper);
         (uint256 limitAmount0, uint256 limitAmount1) = getPositionAmounts(limitLower, limitUpper);
-        total0 = getBalance0() + fullAmount0 + baseAmount0 + limitAmount0;
-        total1 = getBalance1() + fullAmount1 + baseAmount1 + limitAmount1;
+        total0 = getBalance0() + baseAmount0 + limitAmount0;
+        total1 = getBalance1() + baseAmount1 + limitAmount1;
     }
 
     function _calcSharesAndAmounts(uint256 amount0Desired, uint256 amount1Desired)
@@ -284,7 +265,6 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         require(to != address(0) && to != address(this), "to");
 
         // Poke positions so vault's current holdings are up-to-date
-        _poke(fullLower, fullUpper);
         _poke(baseLower, baseUpper);
         _poke(limitLower, limitUpper);
 
@@ -336,13 +316,12 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
 
         // Rebelance
 
-        int24 _fullLower = fullLower;
-        int24 _fullUpper = fullUpper;
+        int24 lowerBound = TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2))));
+        int24 upperBound = TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2 + 32))));
+
         {
-            (uint128 fullLiquidity, , , , ) = _position(_fullLower, _fullUpper);
             (uint128 baseLiquidity, , , , ) = _position(baseLower, baseUpper);
             (uint128 limitLiquidity, , , , ) = _position(limitLower, limitUpper);
-            _burnAndCollect(_fullLower, _fullUpper, fullLiquidity);
             _burnAndCollect(baseLower, baseUpper, baseLiquidity);
             _burnAndCollect(limitLower, limitUpper, limitLiquidity);
         }
@@ -352,30 +331,22 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         int24 tickFloor = _floor(tick);
         int24 tickCeil = tickFloor + tickSpacing;
 
-        int24 _baseLower = tickFloor - baseThreshold;
-        int24 _baseUpper = tickCeil + baseThreshold;
-        int24 _bidLower = tickFloor - limitThreshold;
+        int24 _baseLower = lowerBound;
+        int24 _baseUpper = upperBound;
+        int24 _bidLower = lowerBound;
         int24 _bidUpper = tickFloor;
         int24 _askLower = tickCeil;
-        int24 _askUpper = tickCeil + limitThreshold;
+        int24 _askUpper = upperBound;
+
+        int24 _bidRange;
+        int24 _askRange;
+
+        if (lowerBound < tickFloor) _bidRange = tickFloor - lowerBound;
+        if (upperBound > tickCeil) _askRange = upperBound - tickCeil;
 
         // Emit snapshot to record balances and supply
         uint256 balance0 = getBalance0();
         uint256 balance1 = getBalance1();
-
-        // Place full range order on Uniswap
-        {
-            uint128 maxFullLiquidity = _liquidityForAmounts(
-                _fullLower,
-                _fullUpper,
-                balance0,
-                balance1
-            );
-            uint128 fullLiquidity = _toUint128(
-                uint256(maxFullLiquidity) * fullRangeWeight / 1e6
-            );
-            _mintLiquidity(_fullLower, _fullUpper, fullLiquidity);
-        }
 
         // Place base order on Uniswap
         balance0 = getBalance0();
@@ -397,10 +368,14 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         uint128 bidLiquidity = _liquidityForAmounts(_bidLower, _bidUpper, balance0, balance1);
         uint128 askLiquidity = _liquidityForAmounts(_askLower, _askUpper, balance0, balance1);
         if (bidLiquidity > askLiquidity) {
-            _mintLiquidity(_bidLower, _bidUpper, bidLiquidity);
+            if (_bidRange > 0) {
+                _mintLiquidity(_bidLower, _bidUpper, bidLiquidity);
+            }
             (limitLower, limitUpper) = (_bidLower, _bidUpper);
         } else {
-            _mintLiquidity(_askLower, _askUpper, askLiquidity);
+            if (_askRange > 0) {
+                _mintLiquidity(_askLower, _askUpper, askLiquidity);
+            }
             (limitLower, limitUpper) = (_askLower, _askUpper);
         }
     }

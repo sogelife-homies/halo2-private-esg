@@ -59,9 +59,6 @@ contract InitialDeployDummyVault is Script, Utils {
         DummyVault vaultImplementation = new DummyVault();
         bytes memory initCallData = abi.encodeWithSelector(vaultImplementation.initialize.selector, DummyVaultParams({
             pool: vm.envAddress("POOL_ADDRESS"),
-            baseThreshold: (int24)(vm.envInt("BASE_THRESHOLD")),
-            limitThreshold: (int24)(vm.envInt("LIMIT_THRESHOLD")),
-            fullRangeWeight: (uint24)(vm.envUint("FULL_RANGE_WEIGHT")),
             stratVerfifierAddress: verifier,
             axiomV1QueryAddress: vm.envAddress("AXIOM_V1_QUERY_ADDRESS"),
             name: "ZK-MM LPs",

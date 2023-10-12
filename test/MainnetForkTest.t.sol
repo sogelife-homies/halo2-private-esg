@@ -70,9 +70,6 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
         dv.initialize(DummyVaultParams({
             pool: USDC_WETH_005,
-            baseThreshold: 10,
-            limitThreshold: 10,
-            fullRangeWeight: 10,
             stratVerfifierAddress: verifierAddress,
             axiomV1QueryAddress: address(axiomMock),
             name: "ZK-MM LPs",
