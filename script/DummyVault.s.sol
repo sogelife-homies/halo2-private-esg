@@ -6,6 +6,7 @@ import "forge-std/Script.sol";
 import "forge-std/Base.sol";
 import "../contracts/DummyVault.sol";
 import "openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "openzeppelin/proxy/transparent/ProxyAdmin.sol";
 import "forge-std/console.sol";
 
 abstract contract Utils is ScriptBase {
@@ -76,12 +77,13 @@ contract UpdateDummyVaultImplementation is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         ITransparentUpgradeableProxy proxy = (ITransparentUpgradeableProxy)(payable(vm.envAddress('ACTUAL_DUMMY_VAULT')));
+        ProxyAdmin admin = (ProxyAdmin)(vm.envAddress('ACTUAL_DUMMY_VAULT_PROXY_ADMIN'));
 
         vm.startBroadcast(deployerPrivateKey);
 
         DummyVault vaultImplementation = new DummyVault();
         
-        proxy.upgradeToAndCall(address(vaultImplementation), "0x");
+        admin.upgradeAndCall(proxy, address(vaultImplementation), "");
 
         vm.stopBroadcast();
     }
