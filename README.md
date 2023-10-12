@@ -27,6 +27,8 @@ Pool: https://goerli.etherscan.io/address/0x297FFb1BbAc2F906A7c8f10808E2E48825CF
 
 `forge create --rpc-url $GOERLI_RPC_URL --private-key $PRIVATE_KEY contracts/DummyVault.sol:DummyVault --etherscan-api-key $GOERLI_ETHERSCAN_KEY --verify --constructor-args 0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f 0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f`
 
+### Test tokens pool
+https://app.uniswap.org/swap?inputCurrency=0xF81631aEdB2C5324c6dea012Ac3eb181F1179e6C&outputCurrency=0x4eff99da09F7ea5aCb8754c3731012eC957591FB
 ### TODO
 
 - Restructure the repo.Top level dirs should be halo2-lib, contracts, axiom-sdk
