@@ -156,14 +156,16 @@ fn some_algorithm_in_zk<F: ScalarField>(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let provider = Provider::<Http>::try_from(
-        "https://eth-mainnet.g.alchemy.com/v2/B6N7JmrpWczBs5xEXCfk6on2xqrQ3EIq",
+        //"https://eth-mainnet.g.alchemy.com/v2/B6N7JmrpWczBs5xEXCfk6on2xqrQ3EIq",
+        "https://eth-goerli.g.alchemy.com/v2/q4W0PaEugB3k4NDVqEr8M1Qy87FAd8a3",
     )?;
+    let start_block = 9852682;
     //let block_number: U64 = provider.get_block_number().await?;
-    let address = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640".parse::<Address>()?;
+    //let address = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640".parse::<Address>()?; // MAINNET
+    let address = "0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f".parse::<Address>()?;
     let slot_number: H256 = H256::from_low_u64_be(0);
 
-    let blocks_per_hour = 12 * 5 * 60;
-    let start_block = 18149980;
+    let blocks_per_hour = 12 * 5 * 10;
 
     const U160_BYTES: usize = 20;
     // let mut prices: [u8; N * U160_BYTES];
