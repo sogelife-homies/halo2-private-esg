@@ -166,11 +166,6 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
             );
     }
 
-    function _toUint128(uint256 x) internal pure returns (uint128) {
-        assert(x <= type(uint128).max);
-        return uint128(x);
-    }
-
     function getBalance0() public view returns (uint256) {
         return
             token0.balanceOf(address(this));
@@ -289,6 +284,10 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         require(totalSupply() <= maxTotalSupply, "maxTotalSupply");
     }
 
+    function _applyTickSpacing(int24 tick, int24 tickSpacing) internal pure returns (int24) {
+        return tick + (tickSpacing - (tick % tickSpacing));
+    }
+
     function runStrat(bytes calldata stratProof, ResponseStruct calldata axiomResponse) public {
         // Extract instances from proof
         // The public instances are laid out in the proof calldata as follows:
@@ -316,8 +315,14 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
 
         // Rebelance
 
-        int24 lowerBound = TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2))));
-        int24 upperBound = TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2 + 32))));
+        int24 lowerBound = _applyTickSpacing(
+            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2)))),
+            tickSpacing
+        );
+        int24 upperBound = _applyTickSpacing(
+            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2 + 32)))),
+            tickSpacing
+        );
 
         {
             (uint128 baseLiquidity, , , , ) = _position(baseLower, baseUpper);
@@ -344,13 +349,10 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         if (lowerBound < tickFloor) _bidRange = tickFloor - lowerBound;
         if (upperBound > tickCeil) _askRange = upperBound - tickCeil;
 
-        // Emit snapshot to record balances and supply
+        // Place base order on Uniswap
         uint256 balance0 = getBalance0();
         uint256 balance1 = getBalance1();
 
-        // Place base order on Uniswap
-        balance0 = getBalance0();
-        balance1 = getBalance1();
         {
             uint128 baseLiquidity = _liquidityForAmounts(
                 _baseLower,
