@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import {Test, console2} from "forge-std/Test.sol";
 import "openzeppelin/token/ERC20/IERC20.sol";
-import "openzeppelin/token/ERC20/SafeERC20.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import "v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -66,8 +66,16 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
 
         address verifierAddress = deployVerifier();
-        DummyVault dv = new DummyVault(USDC_WETH_005, verifierAddress);
+        DummyVault dv = new DummyVault();
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
+        dv.initialize(DummyVaultParams({
+            pool: USDC_WETH_005,
+            stratVerfifierAddress: verifierAddress,
+            axiomV1QueryAddress: address(axiomMock),
+            name: "ZK-MM LPs",
+            symbol: "ZMLP",
+            maxTotalSupply: type(uint256).max
+        }));
 
         IERC20(USDC).approve(address(dv), 1 ether);
         IERC20(WETH).approve(address(dv), 1 ether);
@@ -75,7 +83,7 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
         assert(IERC20(USDC).allowance(address(this), address(dv)) == 1 ether);
         assert(IERC20(WETH).allowance(address(this), address(dv)) == 1 ether);
 
-        dv.deposit(1 ether, 1 ether);
+        dv.deposit(1 ether, 1 ether, 0.9 ether, 0.9 ether, address(this));
         assert(IERC20(USDC).balanceOf(address(this)) == 99 ether);
         assert(IERC20(WETH).balanceOf(address(this)) == 99 ether);
 

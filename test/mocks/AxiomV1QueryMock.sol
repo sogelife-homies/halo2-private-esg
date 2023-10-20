@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
+pragma solidity >=0.7.6;
 pragma abicoder v2;
 
 contract AxiomV1QueryMock {
@@ -40,6 +40,10 @@ contract AxiomV1QueryMock {
         AccountResponse[] calldata accountResponses,
         StorageResponse[] calldata storageResponses
     ) external view returns (bool) {
+        return true;
+    }
+
+    function verifiedKeccakResults(bytes32 keccakQueryResponse) external view returns(bool) {
         return true;
     }
 }

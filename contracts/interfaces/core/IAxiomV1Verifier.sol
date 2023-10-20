@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity >=0.7.6;
 pragma abicoder v2;
 
 import {BLOCK_BATCH_DEPTH} from "../../libraries/configuration/AxiomV1Configuration.sol";
