@@ -293,6 +293,54 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         require(totalSupply() <= maxTotalSupply, "maxTotalSupply");
     }
 
+    function withdraw(uint256 shares, uint256 amount0Min, uint256 amount1Min, address to)
+        external
+        nonReentrant
+        returns (uint256 amount0, uint256 amount1)
+    {
+        require(shares > 0, "shares");
+        require(to != address(0) && to != address(this), "to");
+        uint256 totalSupply = totalSupply();
+
+        // Burn shares
+        _burn(msg.sender, shares);
+
+        // Calculate token amounts proportional to unused balances
+        amount0 = (getBalance0() * shares) / totalSupply;
+        amount1 = (getBalance1() * shares) / totalSupply;
+
+        // Withdraw proportion of liquidity from Uniswap pool
+        (uint256 baseAmount0, uint256 baseAmount1) = _burnLiquidityShare(baseLower, baseUpper, shares, totalSupply);
+        (uint256 limitAmount0, uint256 limitAmount1) = _burnLiquidityShare(limitLower, limitUpper, shares, totalSupply);
+
+        // Sum up total amounts owed to recipient
+        amount0 = amount0 + baseAmount0 + limitAmount0;
+        amount1 = amount1 + baseAmount1 + limitAmount1;
+        require(amount0 >= amount0Min, "amount0Min");
+        require(amount1 >= amount1Min, "amount1Min");
+
+        // Push tokens to recipient
+        if (amount0 > 0) token0.safeTransfer(to, amount0);
+        if (amount1 > 0) token1.safeTransfer(to, amount1);
+    }
+
+    function _burnLiquidityShare(int24 tickLower, int24 tickUpper, uint256 shares, uint256 totalSupply)
+        internal
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (uint128 totalLiquidity,,,,) = _position(tickLower, tickUpper);
+        uint256 liquidity = (uint256(totalLiquidity) * shares) / totalSupply;
+
+        if (liquidity > 0) {
+            (uint256 burned0, uint256 burned1, uint256 fees0, uint256 fees1) =
+                _burnAndCollect(tickLower, tickUpper, uint128(liquidity));
+
+            // Add share of fees
+            amount0 = burned0 + ((fees0 * shares) / totalSupply);
+            amount1 = burned1 + ((fees1 * shares) / totalSupply);
+        }
+    }
+
     function _applyTickSpacing(int24 tick, int24 tickSpacing) internal pure returns (int24) {
         return tick + (tickSpacing - (tick % tickSpacing));
     }
