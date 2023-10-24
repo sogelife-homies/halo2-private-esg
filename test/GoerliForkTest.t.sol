@@ -112,9 +112,11 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         int24 tickUpper = tickLower + tickSpacing;
 
         bytes memory proof = loadCallData("evm/call_data.hex");
+        bytes memory axiomProof = loadCallData("evm/call_axiom_proof.hex");
+        DummyVault.ResponseStruct memory decoded = abi.decode(axiomProof, (DummyVault.ResponseStruct));
 
-        uint160 sqrtRatioAX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2))));
-        uint160 sqrtRatioBX96 = uint160((uint256(BytesLib.toBytes32(proof, 4096 / 2 + 32))));
+        uint160 sqrtRatioAX96 = uint160(decoded.storageResponses[31].value & type(uint160).max);
+        uint160 sqrtRatioBX96 = uint160(decoded.storageResponses[32].value & type(uint160).max);
         // console2.log(uint256(sqrtRatioAX96));
         // console2.log(uint256(sqrtRatioBX96));
 

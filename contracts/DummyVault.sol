@@ -345,6 +345,19 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         return tick + (tickSpacing - (tick % tickSpacing));
     }
 
+    function _encodeStratProof(
+        bytes calldata stratProf, 
+        IAxiomV1Query.StorageResponse[] calldata storageResponses
+    ) internal returns(bytes memory) {
+        bytes memory blocksData = "";
+        for (uint i = 0; i < 64; i++) {
+            bytes32 blockData = bytes32(storageResponses[i].value & type(uint160).max);
+            blocksData = abi.encodePacked(blocksData, blockData);
+        }
+
+        return abi.encodePacked(blocksData, stratProf);
+    }
+
     function runStrat(bytes calldata stratProof, ResponseStruct calldata axiomResponse) public {
         // Extract instances from proof
         // The public instances are laid out in the proof calldata as follows:
@@ -365,7 +378,9 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         // address account = address(bytes20(proof[384 + 108:384 + 128]));
         //revert("SnarkVerificationFailed");
         _validateStorageProof(axiomResponse);
-        (bool success,) = stratVerfifierAddress.call(stratProof);
+        (bool success,) = stratVerfifierAddress.call(
+            _encodeStratProof(stratProof, axiomResponse.storageResponses)
+        );
         if (!success) {
             revert("SnarkVerificationFailed");
         }
@@ -373,11 +388,11 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
         // Rebelance
 
         int24 lowerBound = _applyTickSpacing(
-            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2)))),
+            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 0)))),
             tickSpacing
         );
         int24 upperBound = _applyTickSpacing(
-            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 4096 / 2 + 32)))),
+            TickMath.getTickAtSqrtRatio(uint160(uint256(BytesLib.toBytes32(stratProof, 32)))),
             tickSpacing
         );
 
