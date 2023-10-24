@@ -55,6 +55,50 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         return compressed * tickSpacing;
     }
 
+    function testDummyStrat() public {
+        deal(WETH, address(this), 100 ether);
+        assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);
+        deal(USDC, address(this), 100 ether);
+        assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
+
+        address verifierAddress = deployVerifier();
+        DummyVault dv = new DummyVault();
+        AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
+        dv.initialize(DummyVaultParams({
+            pool: USDC_WETH_005,
+            stratVerfifierAddress: verifierAddress,
+            axiomV1QueryAddress: address(axiomMock),
+            name: "ZK-MM LPs",
+            symbol: "ZMLP",
+            maxTotalSupply: type(uint256).max
+        }));
+
+        IERC20(USDC).approve(address(dv), 1 ether);
+        IERC20(WETH).approve(address(dv), 1 ether);
+
+        assert(IERC20(USDC).allowance(address(this), address(dv)) == 1 ether);
+        assert(IERC20(WETH).allowance(address(this), address(dv)) == 1 ether);
+
+        dv.deposit(1 ether, 1 ether, 0.9 ether, 0.9 ether, address(this));
+        assert(IERC20(USDC).balanceOf(address(this)) == 99 ether);
+        assert(IERC20(WETH).balanceOf(address(this)) == 99 ether);
+
+        dv.setAxiomV1QueryAddress(address(axiomMock));
+        bytes memory proof = loadCallData("evm/call_data.hex");
+
+        uint256 lowerBound = (uint256(BytesLib.toBytes32(proof, 0)));
+        uint256 upperBound = (uint256(BytesLib.toBytes32(proof, 32)));
+        console2.log(uint256(lowerBound));
+        console2.log(uint256(upperBound));
+
+        bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
+        
+        DummyVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (DummyVault.ResponseStruct));
+        //console2.log(decoded.storageResponses[0].value);
+
+        dv.runStrat(proof, decoded);
+    }
+
     function testDummyStratNewPool() public {
         deal(WETH, address(this), 100 ether);
         assertEq(IERC20(WETH).balanceOf(address(this)), 100 ether);

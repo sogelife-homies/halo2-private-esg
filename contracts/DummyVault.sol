@@ -351,7 +351,9 @@ contract DummyVault is Initializable, OwnableUpgradeable, IUniswapV3MintCallback
     ) internal returns(bytes memory) {
         bytes memory blocksData = "";
         for (uint i = 0; i < 64; i++) {
-            bytes32 blockData = bytes32(storageResponses[i].value & type(uint160).max);
+            IAxiomV1Query.StorageResponse calldata store = storageResponses[i];
+            require(store.addr == address(poolAddress) && store.slot == 0, "Invalid storage address");
+            bytes32 blockData = bytes32(store.value & type(uint160).max);
             blocksData = abi.encodePacked(blocksData, blockData);
         }
 
