@@ -98,9 +98,9 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
         dv.runStrat(proof, decoded);
 
-        dv.withdraw(shares / 2, 0.49 ether, 0.49 ether, address(this));
-        assert(IERC20(USDC).balanceOf(address(this)) >= 99 ether);
-        assert(IERC20(WETH).balanceOf(address(this)) >= 99 ether);
+        (uint256 withdrawed0, uint256 withdrawed1) = dv.withdraw(shares / 2, 0.49 ether, 0.49 ether, address(this));
+        assert(IERC20(USDC).balanceOf(address(this)) == 99 ether + withdrawed0);
+        assert(IERC20(WETH).balanceOf(address(this)) == 99 ether + withdrawed1);
     }
 
     function testDummyStratNewPool() public {
