@@ -79,7 +79,7 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         assert(IERC20(USDC).allowance(address(this), address(dv)) == 1 ether);
         assert(IERC20(WETH).allowance(address(this), address(dv)) == 1 ether);
 
-        dv.deposit(1 ether, 1 ether, 0.9 ether, 0.9 ether, address(this));
+        (uint256 shares,,) = dv.deposit(1 ether, 1 ether, 0.9 ether, 0.9 ether, address(this));
         assert(IERC20(USDC).balanceOf(address(this)) == 99 ether);
         assert(IERC20(WETH).balanceOf(address(this)) == 99 ether);
 
@@ -97,6 +97,10 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         //console2.log(decoded.storageResponses[0].value);
 
         dv.runStrat(proof, decoded);
+
+        dv.withdraw(shares / 2, 0.49 ether, 0.49 ether, address(this));
+        assert(IERC20(USDC).balanceOf(address(this)) >= 99 ether);
+        assert(IERC20(WETH).balanceOf(address(this)) >= 99 ether);
     }
 
     function testDummyStratNewPool() public {
