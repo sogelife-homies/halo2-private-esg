@@ -11,7 +11,7 @@ import "v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "./yul/YulDeployerTest.t.sol";
-import "../contracts/DummyVault.sol";
+import "../contracts/SnarkedVault.sol";
 import "../contracts/libraries/BytesLib.sol";
 import "../contracts/interfaces/IAxiomV1Query.sol";
 import "./mocks/AxiomV1QueryMock.sol";
@@ -73,7 +73,7 @@ contract MainnetForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
         bytes memory proof = loadCallData("evm/call_data.hex");
         bytes memory axiomProof = loadCallData("evm/call_axiom_proof.hex");
-        DummyVault.ResponseStruct memory decoded = abi.decode(axiomProof, (DummyVault.ResponseStruct));
+        SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomProof, (SnarkedVault.ResponseStruct));
 
         uint160 sqrtRatioAX96 = uint160(decoded.storageResponses[31].value & type(uint160).max);
         uint160 sqrtRatioBX96 = uint160(decoded.storageResponses[32].value & type(uint160).max);

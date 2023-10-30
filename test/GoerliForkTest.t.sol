@@ -12,8 +12,7 @@ import "v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "v3-periphery/libraries/LiquidityAmounts.sol";
 import "v3-core/contracts/libraries/TickMath.sol";
 import "./yul/YulDeployerTest.t.sol";
-//import "./ForkTest.t.sol";
-import "../contracts/DummyVault.sol";
+import "../contracts/SnarkedVault.sol";
 import "../contracts/interfaces/IAxiomV1Query.sol";
 import "./mocks/AxiomV1QueryMock.sol";
 import "./mocks/MockERC20.sol";
@@ -62,16 +61,18 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         assertEq(IERC20(USDC).balanceOf(address(this)), 100 ether);
 
         address verifierAddress = deployVerifier();
-        DummyVault dv = new DummyVault();
+        SnarkedVault dv = new SnarkedVault();
         AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
-        dv.initialize(DummyVaultParams({
-            pool: USDC_WETH_005,
-            stratVerfifierAddress: verifierAddress,
-            axiomV1QueryAddress: address(axiomMock),
-            name: "ZK-MM LPs",
-            symbol: "ZMLP",
-            maxTotalSupply: type(uint256).max
-        }));
+        dv.initialize(
+            SnarkedVaultParams({
+                pool: USDC_WETH_005,
+                stratVerfifierAddress: verifierAddress,
+                axiomV1QueryAddress: address(axiomMock),
+                name: "ZK-MM LPs",
+                symbol: "ZMLP",
+                maxTotalSupply: type(uint256).max
+            })
+        );
 
         IERC20(USDC).approve(address(dv), 1 ether);
         IERC20(WETH).approve(address(dv), 1 ether);
@@ -92,8 +93,8 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
         console2.log(uint256(upperBound));
 
         bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
-        
-        DummyVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (DummyVault.ResponseStruct));
+
+        SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
         //console2.log(decoded.storageResponses[0].value);
 
         dv.runStrat(proof, decoded);
@@ -161,7 +162,7 @@ contract GoerliForkTest is YulDeployerTest, IUniswapV3MintCallback {
 
         bytes memory proof = loadCallData("evm/call_data.hex");
         bytes memory axiomProof = loadCallData("evm/call_axiom_proof.hex");
-        DummyVault.ResponseStruct memory decoded = abi.decode(axiomProof, (DummyVault.ResponseStruct));
+        SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomProof, (SnarkedVault.ResponseStruct));
 
         uint160 sqrtRatioAX96 = uint160(decoded.storageResponses[31].value & type(uint160).max);
         uint160 sqrtRatioBX96 = uint160(decoded.storageResponses[32].value & type(uint160).max);
