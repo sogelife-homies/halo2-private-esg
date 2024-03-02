@@ -4,9 +4,7 @@ pragma abicoder v2;
 
 import "forge-std/Script.sol";
 import "forge-std/Base.sol";
-import "../contracts/SnarkedVault.sol";
-import "openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "openzeppelin/proxy/transparent/ProxyAdmin.sol";
+import "../contracts/SnarkedKPIVault.sol";
 import "forge-std/console.sol";
 
 abstract contract Utils is ScriptBase {
@@ -47,95 +45,95 @@ abstract contract Utils is ScriptBase {
 
 contract InitialDeploySnarkedVault is Script, Utils {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
-        bytes memory verifierBytecode = compileVerifier();
+        // bytes memory verifierBytecode = compileVerifier();
 
-        vm.startBroadcast(deployerPrivateKey);
+        // vm.startBroadcast(deployerPrivateKey);
 
-        address verifier = deployContract(verifierBytecode);
+        // address verifier = deployContract(verifierBytecode);
 
-        SnarkedVault vaultImplementation = new SnarkedVault();
-        bytes memory initCallData = abi.encodeWithSelector(
-            vaultImplementation.initialize.selector,
-            SnarkedVaultParams({
-                pool: vm.envAddress("POOL_ADDRESS"),
-                stratVerfifierAddress: verifier,
-                axiomV1QueryAddress: vm.envAddress("AXIOM_V1_QUERY_ADDRESS"),
-                name: "ZK-MM LPs",
-                symbol: "ZMLP",
-                maxTotalSupply: type(uint256).max
-            })
-        );
+        // SnarkedVault vaultImplementation = new SnarkedVault();
+        // bytes memory initCallData = abi.encodeWithSelector(
+        //     vaultImplementation.initialize.selector,
+        //     SnarkedVaultParams({
+        //         pool: vm.envAddress("POOL_ADDRESS"),
+        //         stratVerfifierAddress: verifier,
+        //         axiomV1QueryAddress: vm.envAddress("AXIOM_V1_QUERY_ADDRESS"),
+        //         name: "ZK-MM LPs",
+        //         symbol: "ZMLP",
+        //         maxTotalSupply: type(uint256).max
+        //     })
+        // );
 
-        new TransparentUpgradeableProxy(address(vaultImplementation), vm.addr(deployerPrivateKey), initCallData);
+        // new TransparentUpgradeableProxy(address(vaultImplementation), vm.addr(deployerPrivateKey), initCallData);
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
     }
 }
 
 contract UpdateSnarkedVaultImplementation is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        ITransparentUpgradeableProxy proxy =
-            (ITransparentUpgradeableProxy)(payable(vm.envAddress("ACTUAL_DUMMY_VAULT")));
-        ProxyAdmin admin = (ProxyAdmin)(vm.envAddress("ACTUAL_DUMMY_VAULT_PROXY_ADMIN"));
+        // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // ITransparentUpgradeableProxy proxy =
+        //     (ITransparentUpgradeableProxy)(payable(vm.envAddress("ACTUAL_DUMMY_VAULT")));
+        // ProxyAdmin admin = (ProxyAdmin)(vm.envAddress("ACTUAL_DUMMY_VAULT_PROXY_ADMIN"));
 
-        vm.startBroadcast(deployerPrivateKey);
+        // vm.startBroadcast(deployerPrivateKey);
 
-        SnarkedVault vaultImplementation = new SnarkedVault();
+        // SnarkedVault vaultImplementation = new SnarkedVault();
 
-        admin.upgradeAndCall(proxy, address(vaultImplementation), "");
+        // admin.upgradeAndCall(proxy, address(vaultImplementation), "");
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
     }
 }
 
 contract UpdateVerifier is Script, Utils {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
-        bytes memory verifierBytecode = compileVerifier();
-        SnarkedVault vault = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
+        // bytes memory verifierBytecode = compileVerifier();
+        // SnarkedVault vault = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
 
-        vm.startBroadcast(deployerPrivateKey);
+        // vm.startBroadcast(deployerPrivateKey);
 
-        address verifier = deployContract(verifierBytecode);
+        // address verifier = deployContract(verifierBytecode);
 
-        vault.setStratVerfifierAddress(verifier);
+        // vault.setStratVerfifierAddress(verifier);
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
     }
 }
 
 contract RunStrat is Script, Utils {
     function run() external {
-        SnarkedVault dv = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
-        bytes memory proof = loadCallData("evm/call_data.hex");
-        bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
+        // SnarkedVault dv = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
+        // bytes memory proof = loadCallData("evm/call_data.hex");
+        // bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
 
-        SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
+        // SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
 
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
-        vm.startBroadcast(deployerPrivateKey);
+        // vm.startBroadcast(deployerPrivateKey);
 
-        dv.runStrat(proof, decoded);
+        // dv.runStrat(proof, decoded);
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
     }
 }
 
 contract EncodeRunStrat is Script, Utils {
     function run() external {
-        SnarkedVault dv = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
-        bytes memory proof = loadCallData("evm/call_data.hex");
-        bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
+        // SnarkedVault dv = (SnarkedVault)(vm.envAddress("ACTUAL_DUMMY_VAULT"));
+        // bytes memory proof = loadCallData("evm/call_data.hex");
+        // bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
 
-        SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
+        // SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
 
-        bytes memory callData = abi.encodeWithSelector(dv.runStrat.selector, proof, decoded);
+        // bytes memory callData = abi.encodeWithSelector(dv.runStrat.selector, proof, decoded);
 
-        console.logBytes(callData);
+        // console.logBytes(callData);
     }
 }
