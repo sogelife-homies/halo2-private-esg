@@ -8,10 +8,6 @@ import "../contracts/SnarkedKPIVault.sol";
 import "./BytesLib.sol";
 
 contract SnarkedKPIVaultTest is YulDeployerTest {
-    function outputStat(bytes calldata proof) public {
-        console2.logBytes32(bytes32(proof[0:32]));
-    }
-
     function testVerifyPublicKPI() public {
         SnarkedKPIVault vault = new SnarkedKPIVault();
 
@@ -31,7 +27,6 @@ contract SnarkedKPIVaultTest is YulDeployerTest {
 
         address company = address(0x1);
         uint256 kpiId = 1;
-        uint256 value = 500;
 
         vault.setKPIVerfier(company, kpiId, verifierAddress);
 
@@ -57,12 +52,10 @@ contract SnarkedKPIVaultTest is YulDeployerTest {
 
         address company = address(0x1);
         uint256 kpiId = 1;
-        uint256 value = 500;
 
         vault.setKPIVerfier(company, kpiId, verifierAddress);
 
         bytes memory proof = loadCallData("evm/call_data.hex");
-        bytes32 publicWitness = (BytesLib.toBytes32(proof, 0));
         proof[32] = 0;
         vm.expectRevert("SnarkVerificationFailed");
 

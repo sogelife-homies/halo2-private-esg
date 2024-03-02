@@ -8,7 +8,7 @@ contract SnarkedKPIVault {
     mapping(bytes32 => bytes32) privateKPICommitment;
     mapping(bytes32 => uint256) privateKPIStatistics;
 
-    function getKPIKey(address company, uint256 kpiId) public view returns (bytes32) {
+    function getKPIKey(address company, uint256 kpiId) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(company, kpiId));
     }
 
