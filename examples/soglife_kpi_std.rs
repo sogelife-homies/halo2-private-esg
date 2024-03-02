@@ -1,25 +1,12 @@
-use axiom_eth::keccak::KeccakChip;
-use axiom_eth::EthChip;
 use axiom_eth::Field;
 use clap::Parser;
-use ethers::providers::{Http, Middleware, Provider};
-use ethers_core::types::{Address, BlockId, BlockNumber, H160, H256, U256, U64};
-use ethers_core::utils::keccak256;
-use halo2_base::gates::GateChip;
-use halo2_base::gates::GateInstructions;
 
-use halo2_base::safe_types::RangeInstructions;
-use halo2_base::utils::{BigPrimeField, ScalarField};
+use halo2_base::utils::BigPrimeField;
 use halo2_base::AssignedValue;
 use halo2_base::Context;
-use halo2_base::QuantumCell::Constant;
 use halo2_scaffold::gadget::fixed_point::{FixedPointChip, FixedPointInstructions};
 use halo2_scaffold::scaffold::cmd::Cli;
-use halo2_scaffold::scaffold::run_eth_builder_on_inputs;
-use halo2_scaffold::scaffold::{run, run_builder_on_inputs};
-use num_bigint::BigUint;
-use num_traits::FromPrimitive;
-use poseidon::PoseidonChip;
+use halo2_scaffold::scaffold::run_builder_on_inputs;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use std::env::{set_var, var};
