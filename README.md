@@ -22,5 +22,4 @@ RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife_kpi_std -- --name sog
 
 ### Test
 
-`forge test --ffi -vvv `
-`forge test --ffi -vvv --match-test=testForkedUniv3LPing`
+`forge test --ffi -vvv`
