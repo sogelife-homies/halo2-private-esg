@@ -5,59 +5,67 @@ pragma abicoder v2;
 import {Test, console2} from "forge-std/Test.sol";
 import "./yul/YulDeployerTest.t.sol";
 import "../contracts/SnarkedKPIVault.sol";
+import "./BytesLib.sol";
 
-contract SnarkedKPIVault is YulDeployerTest {
-    function testDummyStrat() public {
-        address verifierAddress = deployVerifier();
-        SnarkedVault dv = new SnarkedVault();
+contract SnarkedKPIVaultTest is YulDeployerTest {
+    function outputStat(bytes calldata proof) public {
+        console2.logBytes32(bytes32(proof[0:32]));
+    }
 
-        uint256 companyId = 123;
+    function testVerifyPublicKPI() public {
+        SnarkedKPIVault vault = new SnarkedKPIVault();
+
+        address company = address(0x1);
         uint256 kpiId = 1;
         uint256 value = 500;
 
-        assertEq(kpiStore.getKPI(companyId, kpiId), 0);
-        kpiStore.setKPI(companyId, kpiId, value);
-        assertEq(kpiStore.getKPI(companyId, kpiId), value);
+        assertEq(vault.getPublicKPI(company, kpiId), 0);
+        vault.addPublicKPI(company, kpiId, value);
+        assertEq(vault.getPublicKPI(company, kpiId), value);
+    }
 
-        // AxiomV1QueryMock axiomMock = new AxiomV1QueryMock();
-        // dv.initialize(
-        //     SnarkedVaultParams({
-        //         pool: USDC_WETH_005,
-        //         stratVerfifierAddress: verifierAddress,
-        //         axiomV1QueryAddress: address(axiomMock),
-        //         name: "ZK-MM LPs",
-        //         symbol: "ZMLP",
-        //         maxTotalSupply: type(uint256).max
-        //     })
-        // );
+    function testStdStat() public {
+        SnarkedKPIVault vault = new SnarkedKPIVault();
 
-        // IERC20(USDC).approve(address(dv), 1 ether);
-        // IERC20(WETH).approve(address(dv), 1 ether);
+        address verifierAddress = deployVerifier();
 
-        // assert(IERC20(USDC).allowance(address(this), address(dv)) == 1 ether);
-        // assert(IERC20(WETH).allowance(address(this), address(dv)) == 1 ether);
+        address company = address(0x1);
+        uint256 kpiId = 1;
+        uint256 value = 500;
 
-        // (uint256 shares,,) = dv.deposit(1 ether, 1 ether, 0.9 ether, 0.9 ether, address(this));
-        // assert(IERC20(USDC).balanceOf(address(this)) == 99 ether);
-        // assert(IERC20(WETH).balanceOf(address(this)) == 99 ether);
+        vault.setKPIVerfier(company, kpiId, verifierAddress);
 
-        // dv.setAxiomV1QueryAddress(address(axiomMock));
-        // bytes memory proof = loadCallData("evm/call_data.hex");
+        bytes memory proof = loadCallData("evm/call_data.hex");
+        bytes32 publicWitness = (BytesLib.toBytes32(proof, 0));
+        console2.logBytes32(publicWitness);
 
-        // uint256 lowerBound = (uint256(BytesLib.toBytes32(proof, 0)));
-        // uint256 upperBound = (uint256(BytesLib.toBytes32(proof, 32)));
-        // console2.log(uint256(lowerBound));
-        // console2.log(uint256(upperBound));
+        uint256 x1 = 0x0000000000000000000000000000000000000000000000004000000000000000;
+        uint256 x2 = 0x0000000000000000000000000000000000000000000000004ccccccccccccc00;
+        uint256 x3 = 0x0000000000000000000000000000000000000000000000005999999999999800;
+        uint256 x4 = 0x0000000000000000000000000000000000000000000000006666666666666800;
+        uint256 salt = 0x123;
 
-        // bytes memory axiomResponse = loadCallData("evm/call_axiom_proof.hex");
+        assertEq(vault.getPrivateKPIStat(company, kpiId), 0);
+        vault.addPrivateKPI(company, kpiId, keccak256(abi.encodePacked(x1, x2, x3, x4, salt)), proof);
+        assertEq(vault.getPrivateKPIStat(company, kpiId), uint256(publicWitness));
+    }
 
-        // SnarkedVault.ResponseStruct memory decoded = abi.decode(axiomResponse, (SnarkedVault.ResponseStruct));
-        // //console2.log(decoded.storageResponses[0].value);
+    function testVerificationFail() public {
+        SnarkedKPIVault vault = new SnarkedKPIVault();
 
-        // dv.runStrat(proof, decoded);
+        address verifierAddress = deployVerifier();
 
-        // (uint256 withdrawed0, uint256 withdrawed1) = dv.withdraw(shares / 2, 0.49 ether, 0.49 ether, address(this));
-        // assert(IERC20(USDC).balanceOf(address(this)) == 99 ether + withdrawed0);
-        // assert(IERC20(WETH).balanceOf(address(this)) == 99 ether + withdrawed1);
+        address company = address(0x1);
+        uint256 kpiId = 1;
+        uint256 value = 500;
+
+        vault.setKPIVerfier(company, kpiId, verifierAddress);
+
+        bytes memory proof = loadCallData("evm/call_data.hex");
+        bytes32 publicWitness = (BytesLib.toBytes32(proof, 0));
+        proof[32] = 0;
+        vm.expectRevert("SnarkVerificationFailed");
+
+        vault.addPrivateKPI(company, kpiId, keccak256(abi.encodePacked(uint256(0))), proof);
     }
 }
