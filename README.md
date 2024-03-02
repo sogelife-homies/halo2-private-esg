@@ -1,10 +1,10 @@
 ## axiom-univ3-mm
 
-RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 keygen
-RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 prove
-RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 verify
-RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 evm
-RUST_BACKTRACE=1 LOOKUP_BITS=19 cargo run --example univ3_mm -- --name univ3_mm --degree 20 mock
+RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife -- --name soglife --degree 16 keygen
+RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife -- --name soglife --degree 16 prove
+RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife -- --name soglife --degree 16 verify
+RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife -- --name soglife --degree 16 evm
+RUST_BACKTRACE=1 LOOKUP_BITS=7 cargo run --example soglife -- --name soglife --degree 16 mock
 
 ### Test
 
@@ -28,7 +28,9 @@ Pool: https://goerli.etherscan.io/address/0x297FFb1BbAc2F906A7c8f10808E2E48825CF
 `forge create --rpc-url $GOERLI_RPC_URL --private-key $PRIVATE_KEY contracts/DummyVault.sol:DummyVault --etherscan-api-key $GOERLI_ETHERSCAN_KEY --verify --constructor-args 0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f 0x297FFb1BbAc2F906A7c8f10808E2E48825CF5b7f`
 
 ### Test tokens pool
+
 https://app.uniswap.org/swap?inputCurrency=0xF81631aEdB2C5324c6dea012Ac3eb181F1179e6C&outputCurrency=0x4eff99da09F7ea5aCb8754c3731012eC957591FB
+
 ### TODO
 
 - Restructure the repo.Top level dirs should be halo2-lib, contracts, axiom-sdk
