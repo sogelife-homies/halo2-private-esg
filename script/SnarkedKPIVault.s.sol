@@ -54,7 +54,7 @@ contract SnarkedKPIVaultScript is Script, Utils {
         address verifier = deployContract(verifierBytecode);
         SnarkedKPIVault vault = new SnarkedKPIVault();
 
-        address company = address(0x1);
+        address company = address(0xE46DB4484E7eF0177Cc5e672d554DeDcEC0Bee3b);
         uint256 kpiId = 1;
         uint256 value = 500;
         vault.setKPIVerfier(company, kpiId, verifier);
@@ -70,6 +70,29 @@ contract SnarkedKPIVaultScript is Script, Utils {
         bytes memory proof = loadCallData("evm/call_data.hex");
 
         vault.addPrivateKPI(company, kpiId, keccak256(abi.encodePacked(x1, x2, x3, x4, salt)), proof);
+        vm.stopBroadcast();
+    }
+}
+
+contract AddKPIVaultScript is Script, Utils {
+    function run() external {
+        uint256 deployerPrivateKey = vm.envUint("EVM_PRIVATE_KEY");
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        SnarkedKPIVault vault = SnarkedKPIVault(0xd6Ec7C42cC35B8419e398cFe29684baEAb0c2F9d);
+
+        address company = address(0xE46DB4484E7eF0177Cc5e672d554DeDcEC0Bee3b);
+        uint256 kpiId = 1;
+        uint256 value = 400;
+
+        vault.addPublicKPI(company, kpiId, value);
+        vault.addPublicKPI(company, 2, 12500);
+        vault.addPublicKPI(company, 3, 5);
+        vault.addPublicKPI(company, 4, 50);
+        vault.addPublicKPI(company, 5, 50);
+        vault.addPublicKPI(company, 6, 50000);
+
         vm.stopBroadcast();
     }
 }

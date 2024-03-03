@@ -21,9 +21,9 @@ contract SnarkedKPIVault {
         return publicKPI[keccak256(abi.encodePacked(company, kpiId))];
     }
 
-    function setKPIVerfier(address company, uint256 kpiId, address vefifier) external {
+    function setKPIVerfier(address company, uint256 kpiId, address verifier) external {
         bytes32 kpiKey = getKPIKey(company, kpiId);
-        privateKPIVerifierAddress[kpiKey] = vefifier;
+        privateKPIVerifierAddress[kpiKey] = verifier;
     }
 
     function addPrivateKPI(address company, uint256 kpiId, bytes32 commitment, bytes calldata proof) external {
